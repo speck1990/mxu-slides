@@ -30,7 +30,11 @@ public partial class MainWindow : Window
     private readonly string _autosavePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Slides", "autosave.pshow");
+    private readonly string _libraryPath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Slides", "library.json");
     private Show _show = new();
+    private PresentationLibrary _library = new();
     private ProjectionWindow? _projection;
     private bool _black;
 
@@ -47,9 +51,12 @@ public partial class MainWindow : Window
         DisplaySelector.SelectedIndex = secondary >= 0 ? secondary : 0;
         try
         {
+            _library = LibraryFiles.Load(_libraryPath);
             if (File.Exists(_autosavePath)) _show = ShowFiles.Load(_autosavePath);
+            if (_library.ImportMissing(_show.Presentations) || !File.Exists(_libraryPath))
+                LibraryFiles.Save(_libraryPath, _library);
         }
-        catch (Exception ex) { MessageBox.Show($"Could not restore autosave: {ex.Message}"); }
+        catch (Exception ex) { MessageBox.Show($"Could not restore Slides data: {ex.Message}"); }
         RefreshPresentations();
     }
 
@@ -78,7 +85,7 @@ public partial class MainWindow : Window
         if (LibraryList is null) return;
         var selectedId = (LibraryList.SelectedItem as Presentation)?.Id;
         var query = LibrarySearch?.Text.Trim() ?? "";
-        var visible = _show.Presentations.Where(presentation =>
+        var visible = _library.Presentations.Where(presentation =>
             query.Length == 0 || presentation.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase))
             .OrderBy(presentation => presentation.Name).ToArray();
         LibraryList.ItemsSource = visible;
@@ -97,11 +104,10 @@ public partial class MainWindow : Window
 
     private void AddNewPresentation(Presentation presentation)
     {
-        _show.EnsureServiceItems();
-        _show.Presentations.Add(presentation);
-        _show.AddToService(presentation.Id);
+        _library.Upsert(presentation);
+        _library.AddToShow(_show, presentation.Id);
         Changed(_show.ServiceItems!.Count - 1);
-        LibraryList.SelectedItem = presentation;
+        LibraryList.SelectedItem = _library.Presentations.First(item => item.Id == presentation.Id);
     }
 
     private void AddLibrarySelection(object sender, RoutedEventArgs e)
@@ -113,7 +119,7 @@ public partial class MainWindow : Window
         }
         Try(() =>
         {
-            _show.AddToService(presentation.Id);
+            _library.AddToShow(_show, presentation.Id);
             Changed(_show.ServiceItems!.Count - 1);
         });
     }
@@ -133,6 +139,7 @@ public partial class MainWindow : Window
             var index = _show.Presentations.FindIndex(presentation => presentation.Id == selected.Id);
             if (index < 0) throw new InvalidOperationException("Song is missing from the library.");
             _show.Presentations[index] = replacement;
+            _library.Upsert(replacement);
             Changed(Presentations.SelectedIndex);
         });
     }
@@ -185,7 +192,21 @@ public partial class MainWindow : Window
     {
         var picker = new OpenFileDialog { Title = "Open show", Filter = "Slides show|*.pshow|JSON|*.json" };
         if (picker.ShowDialog(this) != true) return;
-        Try(() => { _show = ShowFiles.Load(picker.FileName); Changed(0); });
+        Try(() =>
+        {
+            var opened = ShowFiles.Load(picker.FileName);
+            _library.ImportMissing(opened.Presentations);
+            _show = opened;
+            Changed(0);
+        });
+    }
+
+    private void NewShow(object sender, RoutedEventArgs e)
+    {
+        if (_show.ServiceItems is { Count: > 0 } &&
+            MessageBox.Show(this, "Start a new show? Use Save As first if you want to keep this service.",
+                "Slides", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        Try(() => { _show = new Show { ServiceItems = [] }; Changed(0); });
     }
 
     private void SaveShowAs(object sender, RoutedEventArgs e)
@@ -197,6 +218,7 @@ public partial class MainWindow : Window
 
     private void Changed(int selection)
     {
+        LibraryFiles.Save(_libraryPath, _library);
         ShowFiles.Save(_autosavePath, _show);
         RefreshPresentations(selection);
     }

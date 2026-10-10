@@ -59,6 +59,46 @@ var cases = new (string Name, Action Run)[]
         }
         finally { File.Delete(path); }
     }),
+    ("library survives a new show and keeps show snapshots independent", () =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var libraryPath = Path.Combine(folder, "library.json");
+        var showPath = Path.Combine(folder, "old.pshow");
+        var newShowPath = Path.Combine(folder, "new.pshow");
+        try
+        {
+            var song = SongParser.Parse("Shared song", "Verse 1\nOriginal lyrics");
+            ShowFiles.Save(showPath, new Show { Presentations = [song], ServiceItems = [song.Id] });
+
+            var library = LibraryFiles.Load(libraryPath);
+            Check(library.ImportMissing(ShowFiles.Load(showPath).Presentations), "existing show imported into library");
+            Check(!library.ImportMissing(ShowFiles.Load(showPath).Presentations) && library.Presentations.Count == 1,
+                "opening the same show does not duplicate the song");
+            LibraryFiles.Save(libraryPath, library);
+
+            var nextShow = new Show { ServiceItems = [] };
+            library = LibraryFiles.Load(libraryPath);
+            Check(nextShow.ServiceItems!.Count == 0 && library.Presentations.Count == 1, "new show keeps library");
+            library.AddToShow(nextShow, song.Id);
+            library.AddToShow(nextShow, song.Id);
+            Check(nextShow.ServiceItems!.SequenceEqual([song.Id, song.Id]) && nextShow.Presentations.Count == 1,
+                "library song can appear twice in the service");
+            nextShow.Presentations[0].Slides[0].Text = "Updated lyrics";
+            Check(library.Presentations[0].Slides[0].Text == "Original lyrics", "editing show copy does not mutate library silently");
+            library.Upsert(nextShow.Presentations[0]);
+            LibraryFiles.Save(libraryPath, library);
+            ShowFiles.Save(newShowPath, nextShow);
+            Check(LibraryFiles.Load(libraryPath).Presentations[0].Slides[0].Text == "Updated lyrics",
+                "explicit song edit persists in library");
+            Check(!library.ImportMissing(ShowFiles.Load(showPath).Presentations) &&
+                library.Presentations[0].Slides[0].Text == "Updated lyrics",
+                "opening an older show does not overwrite the library edit");
+            Check(ShowFiles.Load(showPath).Presentations[0].Slides[0].Text == "Original lyrics",
+                "older show keeps its embedded snapshot");
+            Check(ShowFiles.Load(newShowPath).ServiceItems!.Count == 2, "new show remains self-contained");
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }),
     ("MxU presentation subset uses shared schema", () =>
     {
         using var schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "documents.json")));
