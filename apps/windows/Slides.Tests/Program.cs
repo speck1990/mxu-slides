@@ -99,6 +99,67 @@ var cases = new (string Name, Action Run)[]
         }
         finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
     }),
+    ("folders organize the library without changing show snapshots", () =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
+        try
+        {
+            var song = SongParser.Parse("Folder song", "Lyrics");
+            var library = new PresentationLibrary();
+            library.Upsert(song);
+            var folder = library.CreateFolder(" Worship ");
+            library.MoveToFolder(song.Id, folder.Id);
+            LibraryFiles.Save(path, library);
+
+            var reopened = LibraryFiles.Load(path);
+            Check(reopened.Folders[0].Name == "Worship" && reopened.FolderFor(song.Id) == folder.Id,
+                "folder placement survives restart");
+            reopened.RenameFolder(folder.Id, "Songs");
+            try { reopened.CreateFolder("songs"); throw new Exception("FAIL duplicate folder accepted"); }
+            catch (ArgumentException) { }
+            var show = new Show { ServiceItems = [] };
+            reopened.AddToShow(show, song.Id);
+            reopened.DeleteFolder(folder.Id);
+            Check(reopened.FolderFor(song.Id) is null && reopened.Presentations.Count == 1,
+                "deleting a folder keeps its library items");
+            Check(show.Presentations.Count == 1 && show.ServiceItems!.Count == 1,
+                "folder changes do not alter show content");
+
+            File.WriteAllText(path, """{"version":1,"presentations":[]}""");
+            Check(LibraryFiles.Load(path).Folders.Count == 0, "earlier library files open without folders");
+        }
+        finally { File.Delete(path); }
+    }),
+    ("media relinking repairs unique matches and leaves ambiguous names alone", () =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            var media = Path.Combine(folder, "media");
+            var other = Path.Combine(folder, "other");
+            Directory.CreateDirectory(media);
+            Directory.CreateDirectory(other);
+            var unique = Path.Combine(media, "screen.png");
+            File.WriteAllText(unique, "image");
+            File.WriteAllText(Path.Combine(media, "duplicate.png"), "first");
+            File.WriteAllText(Path.Combine(other, "duplicate.png"), "second");
+            var oldRoot = Path.Combine(folder, "old");
+            var presentation = new Presentation { Slides =
+            [
+                new Slide { MediaPath = Path.Combine(oldRoot, "screen.png") },
+                new Slide { MediaPath = Path.Combine(oldRoot, "duplicate.png") },
+                new Slide { MediaPath = Path.Combine(oldRoot, "missing.png") },
+                new Slide { MediaPath = unique }
+            ] };
+            var result = MediaRelinker.Relink([presentation], folder);
+            Check(result == new MediaRelinkResult(1, 1, 1), "relink counts");
+            Check(presentation.Slides[0].MediaPath == unique, "unique file relinked");
+            Check(presentation.Slides[1].MediaPath == Path.Combine(oldRoot, "duplicate.png"),
+                "ambiguous file remains unchanged");
+            Check(presentation.Slides[3].MediaPath == unique, "working file remains unchanged");
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }),
     ("MxU presentation subset uses shared schema", () =>
     {
         using var schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "documents.json")));

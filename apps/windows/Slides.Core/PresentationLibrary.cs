@@ -6,6 +6,62 @@ public sealed class PresentationLibrary
 {
     public int Version { get; set; } = 1;
     public List<Presentation> Presentations { get; set; } = [];
+    public List<LibraryFolder> Folders { get; set; } = [];
+    // Missing assignment means the presentation is at the top level.
+    public Dictionary<string, string> FolderAssignments { get; set; } = [];
+
+    public LibraryFolder CreateFolder(string name)
+    {
+        var folder = new LibraryFolder { Name = ValidFolderName(name) };
+        Folders.Add(folder);
+        return folder;
+    }
+
+    public void RenameFolder(string folderId, string name)
+    {
+        var folder = Folders.FirstOrDefault(item => item.Id == folderId)
+            ?? throw new ArgumentException("Choose a library folder.", nameof(folderId));
+        folder.Name = ValidFolderName(name, folderId);
+    }
+
+    public void DeleteFolder(string folderId)
+    {
+        var folder = Folders.FirstOrDefault(item => item.Id == folderId)
+            ?? throw new ArgumentException("Choose a library folder.", nameof(folderId));
+        Folders.Remove(folder);
+        foreach (var presentationId in FolderAssignments.Where(pair => pair.Value == folderId)
+                     .Select(pair => pair.Key).ToArray())
+            FolderAssignments.Remove(presentationId);
+    }
+
+    public string? FolderFor(string presentationId) =>
+        FolderAssignments.TryGetValue(presentationId, out var folderId) ? folderId : null;
+
+    public void MoveToFolder(string presentationId, string? folderId)
+    {
+        if (!Presentations.Any(item => item.Id == presentationId))
+            throw new ArgumentException("Choose a presentation from the library.", nameof(presentationId));
+        if (folderId is null) FolderAssignments.Remove(presentationId);
+        else
+        {
+            if (!Folders.Any(item => item.Id == folderId))
+                throw new ArgumentException("Choose a library folder.", nameof(folderId));
+            FolderAssignments[presentationId] = folderId;
+        }
+    }
+
+    private string ValidFolderName(string name, string? currentId = null)
+    {
+        var trimmed = name.Trim();
+        if (trimmed.Length == 0) throw new ArgumentException("Give the folder a name.", nameof(name));
+        if (trimmed.Equals("All Slides", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.Equals("Top Level", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("Choose a name other than All Slides or Top Level.", nameof(name));
+        if (Folders.Any(item => item.Id != currentId &&
+            string.Equals(item.Name, trimmed, StringComparison.OrdinalIgnoreCase)))
+            throw new ArgumentException("A folder with that name already exists.", nameof(name));
+        return trimmed;
+    }
 
     public bool ImportMissing(IEnumerable<Presentation> presentations)
     {
@@ -53,6 +109,12 @@ public sealed class PresentationLibrary
     };
 }
 
+public sealed class LibraryFolder
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = "New Folder";
+}
+
 public static class LibraryFiles
 {
     public static PresentationLibrary Load(string path)
@@ -60,10 +122,17 @@ public static class LibraryFiles
         if (!File.Exists(path)) return new PresentationLibrary();
         var library = JsonSerializer.Deserialize<PresentationLibrary>(File.ReadAllText(path), ShowFiles.Json)
             ?? throw new InvalidDataException("The library file is empty.");
-        if (library.Version != 1 || library.Presentations is null)
+        if (library.Version != 1 || library.Presentations is null || library.Folders is null ||
+            library.FolderAssignments is null)
             throw new InvalidDataException("Unsupported library file version.");
         if (library.Presentations.Select(item => item.Id).Distinct().Count() != library.Presentations.Count)
             throw new InvalidDataException("The library contains duplicate presentation IDs.");
+        if (library.Folders.Select(item => item.Id).Distinct().Count() != library.Folders.Count ||
+            library.Folders.Select(item => item.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() != library.Folders.Count)
+            throw new InvalidDataException("The library contains duplicate folders.");
+        if (library.FolderAssignments.Any(pair => !library.Presentations.Any(item => item.Id == pair.Key) ||
+            !library.Folders.Any(item => item.Id == pair.Value)))
+            throw new InvalidDataException("The library contains an invalid folder assignment.");
         return library;
     }
 

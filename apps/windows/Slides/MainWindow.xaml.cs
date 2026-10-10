@@ -27,6 +27,12 @@ public partial class MainWindow : Window
         public Slide Slide { get; } = slide;
     }
 
+    private sealed class FolderChoice(string? id, string name)
+    {
+        public string? Id { get; } = id;
+        public string Name { get; } = name;
+    }
+
     private readonly string _autosavePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Slides", "autosave.pshow");
@@ -57,7 +63,17 @@ public partial class MainWindow : Window
                 LibraryFiles.Save(_libraryPath, _library);
         }
         catch (Exception ex) { MessageBox.Show($"Could not restore Slides data: {ex.Message}"); }
+        RefreshFolderChoices();
         RefreshPresentations();
+    }
+
+    private void RefreshFolderChoices(string? selectedId = null)
+    {
+        var choices = new[] { new FolderChoice(null, "All Slides"), new FolderChoice("", "Top Level") }
+            .Concat(_library.Folders.OrderBy(folder => folder.Name)
+                .Select(folder => new FolderChoice(folder.Id, folder.Name))).ToArray();
+        FolderFilter.ItemsSource = choices;
+        FolderFilter.SelectedItem = choices.FirstOrDefault(choice => choice.Id == selectedId) ?? choices[0];
     }
 
     private void RefreshPresentations(int selection = 0)
@@ -85,8 +101,12 @@ public partial class MainWindow : Window
         if (LibraryList is null) return;
         var selectedId = (LibraryList.SelectedItem as Presentation)?.Id;
         var query = LibrarySearch?.Text.Trim() ?? "";
+        var folderId = (FolderFilter?.SelectedItem as FolderChoice)?.Id;
         var visible = _library.Presentations.Where(presentation =>
-            query.Length == 0 || presentation.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+            (folderId is null || (folderId.Length == 0
+                ? _library.FolderFor(presentation.Id) is null
+                : _library.FolderFor(presentation.Id) == folderId)) &&
+            (query.Length == 0 || presentation.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)))
             .OrderBy(presentation => presentation.Name).ToArray();
         LibraryList.ItemsSource = visible;
         LibraryList.SelectedItem = visible.FirstOrDefault(presentation => presentation.Id == selectedId)
@@ -94,6 +114,103 @@ public partial class MainWindow : Window
     }
 
     private void OnLibrarySearchChanged(object sender, TextChangedEventArgs e) => RefreshLibrary();
+
+    private void OnFolderFilterChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var isFolder = (FolderFilter.SelectedItem as FolderChoice)?.Id is { Length: > 0 };
+        RenameFolderButton.IsEnabled = isFolder;
+        DeleteFolderButton.IsEnabled = isFolder;
+        RefreshLibrary();
+    }
+
+    private void NewFolder(object sender, RoutedEventArgs e)
+    {
+        var dialog = new FolderNameDialog("New folder") { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        Try(() =>
+        {
+            var folder = _library.CreateFolder(dialog.FolderName);
+            LibraryFiles.Save(_libraryPath, _library);
+            RefreshFolderChoices(folder.Id);
+        });
+    }
+
+    private void RenameFolder(object sender, RoutedEventArgs e)
+    {
+        var folderId = (FolderFilter.SelectedItem as FolderChoice)?.Id;
+        var folder = _library.Folders.FirstOrDefault(item => item.Id == folderId);
+        if (folder is null) return;
+        var dialog = new FolderNameDialog("Rename folder", folder.Name) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        Try(() =>
+        {
+            _library.RenameFolder(folder.Id, dialog.FolderName);
+            LibraryFiles.Save(_libraryPath, _library);
+            RefreshFolderChoices(folder.Id);
+        });
+    }
+
+    private void DeleteFolder(object sender, RoutedEventArgs e)
+    {
+        var folderId = (FolderFilter.SelectedItem as FolderChoice)?.Id;
+        if (folderId is null || folderId.Length == 0) return;
+        if (MessageBox.Show(this, "Delete this folder? Its items will move to Top Level.",
+                "Slides", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        Try(() =>
+        {
+            _library.DeleteFolder(folderId);
+            LibraryFiles.Save(_libraryPath, _library);
+            RefreshFolderChoices("");
+        });
+    }
+
+    private void MoveLibraryItem(object sender, RoutedEventArgs e)
+    {
+        if (LibraryList.SelectedItem is not Presentation presentation)
+        {
+            Status.Text = "Choose a library item to move.";
+            return;
+        }
+        var menu = new ContextMenu();
+        void AddChoice(string label, string? folderId)
+        {
+            var item = new MenuItem
+            {
+                Header = label,
+                IsChecked = _library.FolderFor(presentation.Id) == folderId
+            };
+            item.Click += (_, _) => Try(() =>
+            {
+                _library.MoveToFolder(presentation.Id, folderId);
+                LibraryFiles.Save(_libraryPath, _library);
+                RefreshLibrary();
+            });
+            menu.Items.Add(item);
+        }
+        AddChoice("Top Level", null);
+        foreach (var folder in _library.Folders.OrderBy(folder => folder.Name))
+            AddChoice(folder.Name, folder.Id);
+        menu.PlacementTarget = (Button)sender;
+        menu.IsOpen = true;
+    }
+
+    private void RelinkMedia(object sender, RoutedEventArgs e)
+    {
+        using var picker = new Forms.FolderBrowserDialog
+        {
+            Description = "Choose the folder containing your moved images and videos",
+            ShowNewFolderButton = false
+        };
+        if (picker.ShowDialog() != Forms.DialogResult.OK) return;
+        Try(() =>
+        {
+            var result = MediaRelinker.Relink(_library.Presentations.Concat(_show.Presentations), picker.SelectedPath);
+            if (result.Updated > 0) Changed(Presentations.SelectedIndex);
+            MessageBox.Show(this,
+                $"Relinked {result.Updated} media references. {result.Unresolved} not found; {result.Ambiguous} had more than one match.",
+                "Slides");
+        });
+    }
 
     private void AddSong(object sender, RoutedEventArgs e)
     {
@@ -105,6 +222,8 @@ public partial class MainWindow : Window
     private void AddNewPresentation(Presentation presentation)
     {
         _library.Upsert(presentation);
+        var folderId = (FolderFilter.SelectedItem as FolderChoice)?.Id;
+        if (!string.IsNullOrEmpty(folderId)) _library.MoveToFolder(presentation.Id, folderId);
         _library.AddToShow(_show, presentation.Id);
         Changed(_show.ServiceItems!.Count - 1);
         LibraryList.SelectedItem = _library.Presentations.First(item => item.Id == presentation.Id);

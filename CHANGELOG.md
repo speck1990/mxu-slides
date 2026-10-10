@@ -4,6 +4,7 @@
 
 ### Added
 
+- Windows library folders with create, rename, delete, and move actions; manual relinking for moved images and videos with ambiguity protection.
 - Persistent Windows song and slide library shared across shows, one-time import from existing `.pshow` files, and a New Show action that keeps the library.
 - Microsoft Defender scanning and a SHA-256 record for Windows CI downloads.
 - Recognize unbracketed song section headings on Windows, repair headings saved by earlier Windows builds, and preserve section labels when editing songs.
