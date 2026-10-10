@@ -1,5 +1,7 @@
 # MxU Slides
 
+> This fork contains a personal Windows port named **Peck Slides**. See [the Windows guide](apps/windows/README.md) and [changelog](CHANGELOG.md). The original macOS application and MxU attribution remain below.
+
 A native macOS presentation app for churches: lyrics, slides, media, timers, stage displays, NDI and DeckLink output, and live streaming. Everything runs on this Mac: no account, no server.
 
 MxU Slides is source-available under the PolyForm Shield License 1.0.0. See [LICENSE.md](LICENSE.md).

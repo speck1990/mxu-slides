@@ -1,0 +1,68 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main, 'windows/**']
+    paths:
+      - 'apps/windows/**'
+      - 'packages/schema/documents.json'
+      - '.github/workflows/windows.yml'
+      - 'LICENSE.md'
+  pull_request:
+    paths:
+      - 'apps/windows/**'
+      - 'packages/schema/documents.json'
+      - '.github/workflows/windows.yml'
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Create a prerelease from this successful build'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run core regression tests
+        run: dotnet run --project apps/windows/PeckSlides.Tests/PeckSlides.Tests.csproj --configuration Release
+      - name: Publish self-contained Windows app
+        run: dotnet publish apps/windows/PeckSlides/PeckSlides.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/PeckSlides-win-x64 -p:PublishSingleFile=false
+      - name: Check executable and required notice
+        shell: pwsh
+        run: |
+          if (!(Test-Path artifacts/PeckSlides-win-x64/PeckSlides.exe)) { throw 'PeckSlides.exe missing' }
+          if (!(Test-Path artifacts/PeckSlides-win-x64/LICENSE.md)) { throw 'LICENSE.md missing' }
+      - name: Upload Windows download
+        uses: actions/upload-artifact@v4
+        with:
+          name: PeckSlides-win-x64
+          path: artifacts/PeckSlides-win-x64/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Package prerelease
+        if: github.event_name == 'workflow_dispatch' && inputs.prerelease
+        shell: pwsh
+        run: Compress-Archive -Path artifacts/PeckSlides-win-x64/* -DestinationPath artifacts/PeckSlides-win-x64.zip
+      - name: Publish prerelease
+        if: github.event_name == 'workflow_dispatch' && inputs.prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create "windows-v0.1.0-${{ github.run_number }}" artifacts/PeckSlides-win-x64.zip --target "${{ github.sha }}" --prerelease --title "Windows preview 0.1.0 build ${{ github.run_number }}" --notes "Personal Windows preview. See LICENSE.md for the original MxU notice and terms."
+      - name: Report failure
+        if: failure()
+        shell: pwsh
+        run: Add-Content $env:GITHUB_STEP_SUMMARY "Windows build failed. Open the failing step in this run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"

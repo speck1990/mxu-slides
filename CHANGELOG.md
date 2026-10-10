@@ -1,0 +1,14 @@
+# Changelog
+
+## Unreleased
+
+### Added
+
+- Personal Windows preview under the distinct **Peck Slides** name.
+- Native WPF control window with offline song parsing, show autosave, standalone MxU Presentation JSON text import, local image/video slides, output preview, keyboard navigation, black screen, and fullscreen audience output on a selected display.
+- Windows GitHub Actions test, self-contained build artifact, manual build, and optional prerelease workflow.
+
+### Known limits
+
+- MxU library database, advanced slide objects, themes, media relinking, NDI, stage display, and DeckLink are not yet implemented on Windows.
+- Windows build and media behavior require validation on GitHub Actions and a Windows PC.
