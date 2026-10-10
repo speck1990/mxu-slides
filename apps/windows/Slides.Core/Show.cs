@@ -65,9 +65,11 @@ public static class ShowFiles
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static Show Load(string path)
+    public static Show Load(string path) => Parse(File.ReadAllText(path));
+
+    internal static Show Parse(string json)
     {
-        var show = JsonSerializer.Deserialize<Show>(File.ReadAllText(path), Json)
+        var show = JsonSerializer.Deserialize<Show>(json, Json)
             ?? throw new InvalidDataException("The show file is empty.");
         if (show.Version != 1 || show.Presentations is null)
             throw new InvalidDataException("Unsupported show file version.");

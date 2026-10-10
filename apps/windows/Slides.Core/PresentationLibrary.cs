@@ -76,6 +76,27 @@ public sealed class PresentationLibrary
         return added;
     }
 
+    public bool RepairMissingMediaFrom(IEnumerable<Presentation> presentations)
+    {
+        var changed = false;
+        var byId = Presentations.ToDictionary(presentation => presentation.Id);
+        foreach (var source in presentations)
+        {
+            if (!byId.TryGetValue(source.Id, out var target)) continue;
+            var slides = target.Slides.ToDictionary(slide => slide.Id);
+            foreach (var sourceSlide in source.Slides)
+            {
+                if (!slides.TryGetValue(sourceSlide.Id, out var targetSlide) ||
+                    string.IsNullOrWhiteSpace(sourceSlide.MediaPath) || !File.Exists(sourceSlide.MediaPath) ||
+                    !string.IsNullOrWhiteSpace(targetSlide.MediaPath) && File.Exists(targetSlide.MediaPath))
+                    continue;
+                targetSlide.MediaPath = sourceSlide.MediaPath;
+                changed = true;
+            }
+        }
+        return changed;
+    }
+
     public void Upsert(Presentation presentation)
     {
         var copy = Copy(presentation);

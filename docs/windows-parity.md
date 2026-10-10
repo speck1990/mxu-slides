@@ -9,12 +9,12 @@ The goal is the same church presentation workflow and visual hierarchy on Window
 | Library | Persistent local presentation list and search across shows; folders with create, rename, delete, and move; import from opened `.pshow`; manual media relinking by unique filename | Indexing, full media management, migration from Mac documents |
 | Slides | Song sections, text thumbnails, local images and video | Object editor, themes, typography, animations, overlays, advanced media layers |
 | Output | Fullscreen audience window on a selected display; blackout | Screen layouts and presets, stage displays, NDI, DeckLink, streaming |
-| Import | Standalone MxU Presentation JSON text subset | Mac library documents, PPTX, ProPresenter, media packaging with portable references |
+| Import | Standalone MxU Presentation JSON text subset; portable `.slidespack` import/export with verified embedded media | Mac library documents, PPTX, ProPresenter, direct Mac document portability |
 | Operations | Autosave, portable `.pshow`, Windows CI artifact | Settings, backups, diagnostics, local API, signed installer |
 
 ## Development order
 
-1. Continue matching the Mac document and library behavior, including portable media references and native Mac library import.
+1. Continue matching the Mac document and library behavior, including native Mac library import and richer media management.
 2. Port the scene and theme behavior needed for visually matching slides, with screenshot comparisons at 16:9 and common output resolutions.
 3. Complete service editing and controls, then add stage and production outputs.
 4. Validate each milestone on a Windows PC using the GitHub Actions download. Keep the Mac build green and document any Mac-to-Windows behavior differences until they are closed.

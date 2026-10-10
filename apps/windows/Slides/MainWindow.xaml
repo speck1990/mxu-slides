@@ -128,6 +128,7 @@
             <Button Content="New Show" Click="NewShow" />
             <Button Content="Open Show" Click="OpenShow" />
             <Button Content="Save As" Click="SaveShowAs" />
+            <Button Content="Pack Show" Click="PackShow" ToolTip="Save a portable show with its media" />
           </StackPanel>
         </Grid>
         <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource Line}" />

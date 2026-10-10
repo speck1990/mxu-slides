@@ -39,6 +39,9 @@ public partial class MainWindow : Window
     private readonly string _libraryPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Slides", "library.json");
+    private readonly string _packageCachePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Slides", "packages");
     private Show _show = new();
     private PresentationLibrary _library = new();
     private ProjectionWindow? _projection;
@@ -309,14 +312,38 @@ public partial class MainWindow : Window
 
     private void OpenShow(object sender, RoutedEventArgs e)
     {
-        var picker = new OpenFileDialog { Title = "Open show", Filter = "Slides show|*.pshow|JSON|*.json" };
+        var picker = new OpenFileDialog
+        {
+            Title = "Open show",
+            Filter = "Slides shows|*.pshow;*.slidespack|Portable show|*.slidespack|Show JSON|*.pshow;*.json"
+        };
         if (picker.ShowDialog(this) != true) return;
         Try(() =>
         {
-            var opened = ShowFiles.Load(picker.FileName);
+            var opened = Path.GetExtension(picker.FileName).Equals(".slidespack", StringComparison.OrdinalIgnoreCase)
+                ? ShowPackage.Open(picker.FileName, _packageCachePath)
+                : ShowFiles.Load(picker.FileName);
             _library.ImportMissing(opened.Presentations);
+            _library.RepairMissingMediaFrom(opened.Presentations);
             _show = opened;
             Changed(0);
+        });
+    }
+
+    private void PackShow(object sender, RoutedEventArgs e)
+    {
+        var picker = new SaveFileDialog
+        {
+            Title = "Save portable show with media",
+            Filter = "Slides portable show|*.slidespack",
+            DefaultExt = ".slidespack",
+            AddExtension = true
+        };
+        if (picker.ShowDialog(this) != true) return;
+        Try(() =>
+        {
+            ShowPackage.Save(picker.FileName, _show);
+            MessageBox.Show(this, "Portable show saved with its media.", "Slides");
         });
     }
 
