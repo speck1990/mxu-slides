@@ -116,6 +116,7 @@
           <TextBlock x:Name="SelectionTitle" Text="Select an item in Service Flow" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
           <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
             <Button Content="Edit Song" Click="EditSong" />
+            <Button Content="New Show" Click="NewShow" />
             <Button Content="Open Show" Click="OpenShow" />
             <Button Content="Save As" Click="SaveShowAs" />
           </StackPanel>

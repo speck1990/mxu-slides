@@ -6,12 +6,12 @@ The [Windows parity tracker](../../docs/windows-parity.md) records what still di
 
 ## Preview features
 
-- The workspace follows the Mac app's main layout: **Service Flow** and **Libraries** on the left, slide thumbnails in the center, and **Output Preview** and projection controls on the right. The Windows library is currently stored inside each `.pshow` file.
+- The workspace follows the Mac app's main layout: **Service Flow** and **Libraries** on the left, slide thumbnails in the center, and **Output Preview** and projection controls on the right. The library persists locally across shows in `%LOCALAPPDATA%\Slides\library.json`.
 - Create songs with **New Song** or **+ New**. Blank lines divide slides; `[Verse]` and `[Chorus]` mark sections. Add a library item to the service again by selecting it and pressing **+ Add Item** or double-clicking it. Reorder service items with the arrow buttons; removing one keeps its library copy.
 - Add a local image or video as a slide. Playback uses Windows media codecs and works without a network connection.
 - Import a standalone MxU Presentation JSON file. The preview reads visible text objects and solid slide backgrounds. It does not import the macOS library database or advanced slide designs.
-- Choose an audience display and start fullscreen projection with F5. Use Left/Right to navigate and B to black out. Shows autosave under `%LOCALAPPDATA%\Slides` and can be opened or saved as `.pshow` files.
-- Existing `.pshow` files open with their original presentation order as the service. Saving them adds the service order while preserving the library entries.
+- Choose an audience display and start fullscreen projection with F5. Use Left/Right to navigate and B to black out. Shows autosave under `%LOCALAPPDATA%\Slides` and can be opened or saved as `.pshow` files. **New Show** clears the service while keeping the library; use **Save As** first to keep a copy of the current service.
+- Existing `.pshow` files open with their original presentation order as the service. Their presentations are imported into the local library once. A `.pshow` keeps its own presentation snapshots, so older shows remain self-contained; editing a song in the current service also updates its library copy. Media paths remain local to the PC and may need relinking when a show moves to another computer.
 
 ## Download and run
 

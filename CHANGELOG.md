@@ -4,6 +4,7 @@
 
 ### Added
 
+- Persistent Windows song and slide library shared across shows, one-time import from existing `.pshow` files, and a New Show action that keeps the library.
 - Microsoft Defender scanning and a SHA-256 record for Windows CI downloads.
 - Recognize unbracketed song section headings on Windows, repair headings saved by earlier Windows builds, and preserve section labels when editing songs.
 - Windows workspace with separate show-scoped library and ordered service flow, slide thumbnails, Mac-style panel layout, and backward-compatible `.pshow` loading.
