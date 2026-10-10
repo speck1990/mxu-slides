@@ -24,7 +24,7 @@ import PresenterCore
 
     func signIn() async throws {
         let verifier = Data((0..<32).map { _ in UInt8.random(in: .min ... .max) }).base64URL
-        let challenge = Data(SHA256.hash(Data(verifier.utf8))).base64URL
+        let challenge = Data(SHA256.hash(data: Data(verifier.utf8))).base64URL
         let state = UUID().uuidString
         var components = URLComponents(string: "https://identityservices.ccli.com/connect/authorize")!
         components.queryItems = [
@@ -154,7 +154,7 @@ private final class SongSelectLoopback: @unchecked Sendable {
                         let body = "SongSelect sign-in complete. Return to Slides."
                         let response = "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: \(body.utf8.count)\r\nConnection: close\r\n\r\n\(body)"
                         connection.send(content: Data(response.utf8), completion: .contentProcessed { _ in connection.cancel() })
-                        finish(.success(url))
+                        self.finish(.success(url))
                     }
                 }
                 listener.start(queue: queue)
