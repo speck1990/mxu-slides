@@ -6,16 +6,16 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Microsoft.Win32;
-using PeckSlides.Core;
+using Slides.Core;
 using Forms = System.Windows.Forms;
 
-namespace PeckSlides;
+namespace Slides;
 
 public partial class MainWindow : Window
 {
     private readonly string _autosavePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "PeckSlides", "autosave.pshow");
+        "Slides", "autosave.pshow");
     private Show _show = new();
     private ProjectionWindow? _projection;
     private bool _black;
@@ -75,7 +75,7 @@ public partial class MainWindow : Window
     {
         if (Presentations.SelectedIndex < 0) return;
         var index = Presentations.SelectedIndex;
-        if (MessageBox.Show(this, "Remove this song or deck from the show?", "Peck Slides", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        if (MessageBox.Show(this, "Remove this song or deck from the show?", "Slides", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
         _show.Presentations.RemoveAt(index);
         Changed(Math.Max(0, index - 1));
     }
@@ -110,14 +110,14 @@ public partial class MainWindow : Window
 
     private void OpenShow(object sender, RoutedEventArgs e)
     {
-        var picker = new OpenFileDialog { Title = "Open show", Filter = "Peck Slides show|*.pshow|JSON|*.json" };
+        var picker = new OpenFileDialog { Title = "Open show", Filter = "Slides show|*.pshow|JSON|*.json" };
         if (picker.ShowDialog(this) != true) return;
         Try(() => { _show = ShowFiles.Load(picker.FileName); Changed(0); });
     }
 
     private void SaveShowAs(object sender, RoutedEventArgs e)
     {
-        var picker = new SaveFileDialog { Title = "Save show", Filter = "Peck Slides show|*.pshow" };
+        var picker = new SaveFileDialog { Title = "Save show", Filter = "Slides show|*.pshow" };
         if (picker.ShowDialog(this) != true) return;
         Try(() => ShowFiles.Save(picker.FileName, _show));
     }
@@ -197,6 +197,6 @@ public partial class MainWindow : Window
     private void Try(Action operation)
     {
         try { operation(); }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Peck Slides", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "Slides", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 }

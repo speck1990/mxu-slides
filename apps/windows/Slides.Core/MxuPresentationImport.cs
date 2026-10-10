@@ -1,6 +1,6 @@
 using System.Text.Json;
 
-namespace PeckSlides.Core;
+namespace Slides.Core;
 
 // Reads the portable Presentation/Slide/SlideObject fields defined in
 // packages/schema/documents.json. Unknown macOS-only fields are ignored.

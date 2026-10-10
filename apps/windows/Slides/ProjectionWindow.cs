@@ -2,7 +2,7 @@ using System.Windows;
 using System.Windows.Input;
 using Forms = System.Windows.Forms;
 
-namespace PeckSlides;
+namespace Slides;
 
 public sealed class ProjectionWindow : Window
 {
@@ -10,7 +10,7 @@ public sealed class ProjectionWindow : Window
 
     public ProjectionWindow(Forms.Screen display)
     {
-        Title = "Peck Slides Audience";
+        Title = "Slides Audience";
         Content = _surface;
         Background = System.Windows.Media.Brushes.Black;
         WindowStyle = WindowStyle.None;
@@ -25,5 +25,5 @@ public sealed class ProjectionWindow : Window
         KeyDown += (_, args) => { if (args.Key == Key.Escape) Close(); };
     }
 
-    public void ShowSlide(PeckSlides.Core.Slide? slide, bool black) => _surface.Show(slide, black);
+    public void ShowSlide(Slides.Core.Slide? slide, bool black) => _surface.Show(slide, black);
 }

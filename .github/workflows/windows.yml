@@ -36,32 +36,32 @@ jobs:
         with:
           dotnet-version: '8.0.x'
       - name: Run core regression tests
-        run: dotnet run --project apps/windows/PeckSlides.Tests/PeckSlides.Tests.csproj --configuration Release
+        run: dotnet run --project apps/windows/Slides.Tests/Slides.Tests.csproj --configuration Release
       - name: Publish self-contained Windows app
-        run: dotnet publish apps/windows/PeckSlides/PeckSlides.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/PeckSlides-win-x64 -p:PublishSingleFile=false
+        run: dotnet publish apps/windows/Slides/Slides.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/Slides-win-x64 -p:PublishSingleFile=false
       - name: Check executable and required notice
         shell: pwsh
         run: |
-          if (!(Test-Path artifacts/PeckSlides-win-x64/PeckSlides.exe)) { throw 'PeckSlides.exe missing' }
-          if (!(Test-Path artifacts/PeckSlides-win-x64/LICENSE.md)) { throw 'LICENSE.md missing' }
+          if (!(Test-Path artifacts/Slides-win-x64/Slides.exe)) { throw 'Slides.exe missing' }
+          if (!(Test-Path artifacts/Slides-win-x64/LICENSE.md)) { throw 'LICENSE.md missing' }
       - name: Upload Windows download
         uses: actions/upload-artifact@v4
         with:
-          name: PeckSlides-win-x64
-          path: artifacts/PeckSlides-win-x64/
+          name: Slides-win-x64
+          path: artifacts/Slides-win-x64/
           if-no-files-found: error
           retention-days: 30
       - name: Package prerelease
         if: github.event_name == 'workflow_dispatch' && inputs.prerelease
         shell: pwsh
-        run: Compress-Archive -Path artifacts/PeckSlides-win-x64/* -DestinationPath artifacts/PeckSlides-win-x64.zip
+        run: Compress-Archive -Path artifacts/Slides-win-x64/* -DestinationPath artifacts/Slides-win-x64.zip
       - name: Publish prerelease
         if: github.event_name == 'workflow_dispatch' && inputs.prerelease
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          gh release create "windows-v0.1.0-${{ github.run_number }}" artifacts/PeckSlides-win-x64.zip --target "${{ github.sha }}" --prerelease --title "Windows preview 0.1.0 build ${{ github.run_number }}" --notes "Personal Windows preview. See LICENSE.md for the original MxU notice and terms."
+          gh release create "windows-v0.1.0-${{ github.run_number }}" artifacts/Slides-win-x64.zip --target "${{ github.sha }}" --prerelease --title "Windows preview 0.1.0 build ${{ github.run_number }}" --notes "Personal Windows preview. See LICENSE.md for the original MxU notice and terms."
       - name: Report failure
         if: failure()
         shell: pwsh

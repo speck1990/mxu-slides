@@ -4,7 +4,8 @@
 
 ### Added
 
-- Personal Windows preview under the distinct **Peck Slides** name.
+- Personal Windows preview under the distinct **Slides** name, including `Slides.exe` and a matching build artifact.
+- Repeatable macOS debug build, local installation, and launch script with a Codex Run action.
 - Native WPF control window with offline song parsing, show autosave, standalone MxU Presentation JSON text import, local image/video slides, output preview, keyboard navigation, black screen, and fullscreen audience output on a selected display.
 - Windows GitHub Actions test, self-contained build artifact, manual build, and optional prerelease workflow.
 

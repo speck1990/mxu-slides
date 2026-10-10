@@ -1,6 +1,6 @@
 # MxU Slides
 
-> This fork contains a personal Windows port named **Peck Slides**. See [the Windows guide](apps/windows/README.md) and [changelog](CHANGELOG.md). The original macOS application and MxU attribution remain below.
+> This fork contains a personal Windows port named **Slides**. See [the Windows guide](apps/windows/README.md) and [changelog](CHANGELOG.md). The original macOS application and MxU attribution remain below.
 
 A native macOS presentation app for churches: lyrics, slides, media, timers, stage displays, NDI and DeckLink output, and live streaming. Everything runs on this Mac: no account, no server.
 
@@ -40,6 +40,8 @@ xcodegen generate
 xcodebuild -project MxUSlides.xcodeproj -scheme MxUSlides -configuration Debug -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile build
 open "$(xcodebuild -project MxUSlides.xcodeproj -scheme MxUSlides -configuration Debug -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile -showBuildSettings 2>/dev/null | awk '/TARGET_BUILD_DIR/{print $3; exit}')/MxU Slides.app"
 ```
+
+For a local Mac installation, `./script/build_and_run.sh --verify` builds the debug app, installs it into `~/Applications`, opens it, and checks that its process started. The Codex Run action uses the same script. This command requires a Mac with Xcode 26, Node 24, and XcodeGen; the script installs XcodeGen through Homebrew if needed.
 
 Or open `MxUSlides.xcodeproj` in Xcode after `xcodegen generate` and run the `MxUSlides` scheme. Re-run `xcodegen generate` whenever you add or remove source files; the project file is generated and not checked in.
 

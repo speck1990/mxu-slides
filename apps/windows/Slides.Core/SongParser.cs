@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace PeckSlides.Core;
+namespace Slides.Core;
 
 public static partial class SongParser
 {

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace PeckSlides.Core;
+namespace Slides.Core;
 
 public sealed class Show
 {

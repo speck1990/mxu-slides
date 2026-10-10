@@ -1,7 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 
-namespace PeckSlides;
+namespace Slides;
 
 public sealed class SongEditor : Window
 {

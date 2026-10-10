@@ -7,7 +7,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../PeckSlides.Core/PeckSlides.Core.csproj" />
+    <ProjectReference Include="../Slides.Core/Slides.Core.csproj" />
     <None Include="../../../packages/schema/documents.json" Link="documents.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

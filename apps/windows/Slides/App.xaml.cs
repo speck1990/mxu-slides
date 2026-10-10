@@ -1,5 +1,5 @@
 using System.Windows;
 
-namespace PeckSlides;
+namespace Slides;
 
 public partial class App : Application { }

@@ -5,9 +5,9 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using PeckSlides.Core;
+using Slides.Core;
 
-namespace PeckSlides;
+namespace Slides;
 
 public sealed class SlideSurface : Grid
 {

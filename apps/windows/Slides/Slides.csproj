@@ -7,11 +7,11 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
-    <AssemblyName>PeckSlides</AssemblyName>
+    <AssemblyName>Slides</AssemblyName>
     <Version>0.1.0</Version>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../PeckSlides.Core/PeckSlides.Core.csproj" />
+    <ProjectReference Include="../Slides.Core/Slides.Core.csproj" />
     <None Include="../../../LICENSE.md" Link="LICENSE.md" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

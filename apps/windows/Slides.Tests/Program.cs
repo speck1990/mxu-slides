@@ -1,5 +1,5 @@
 using System.Text.Json;
-using PeckSlides.Core;
+using Slides.Core;
 
 var cases = new (string Name, Action Run)[]
 {
