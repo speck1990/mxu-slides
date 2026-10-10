@@ -114,20 +114,7 @@ public sealed class PresentationLibrary
         show.AddToService(presentationId);
     }
 
-    private static Presentation Copy(Presentation source) => new()
-    {
-        Id = source.Id,
-        Name = source.Name,
-        Kind = source.Kind,
-        Slides = source.Slides.Select(slide => new Slide
-        {
-            Id = slide.Id,
-            Name = slide.Name,
-            Text = slide.Text,
-            MediaPath = slide.MediaPath,
-            Background = slide.Background
-        }).ToList()
-    };
+    private static Presentation Copy(Presentation source) => PresentationEditing.Copy(source);
 }
 
 public sealed class LibraryFolder

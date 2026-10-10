@@ -237,6 +237,40 @@ var cases = new (string Name, Action Run)[]
         try { SlideLayout.Validate(objects); throw new Exception("FAIL off-canvas geometry accepted"); }
         catch (ArgumentException) { }
     }),
+    ("canvas gestures and ellipse layouts survive library and show copies", () =>
+    {
+        var text = new SlideElement { Name = "Title", Text = "Welcome", X = 40, Y = 50, Width = 300, Height = 100 };
+        SlideLayout.Translate(text, 25, -10);
+        SlideLayout.Resize(text, 80, 30);
+        Check(text.X == 65 && text.Y == 40 && text.Width == 380 && text.Height == 130,
+            "drag and resize use the slide design canvas");
+        SlideLayout.Resize(text, -1000, -1000);
+        Check(text.Width == 12 && text.Height == 12, "resize keeps an object usable");
+        var elements = new List<SlideElement> { text };
+        var ellipse = SlideLayout.AddEllipse(elements);
+        ellipse.FillColorHex = "#FFAA00FF";
+        var slide = new Slide { TextStyle = new SlideTextStyle { FontSize = 61 } };
+        SlideLayout.Apply(slide, elements);
+        var deck = new Presentation { Kind = "deck", Slides = [slide] };
+        var library = new PresentationLibrary();
+        library.Upsert(deck);
+        Check(library.Presentations[0].Slides[0].TextStyle?.FontSize == 61 &&
+            library.Presentations[0].Slides[0].Elements?[1].ShapeKind == "ellipse",
+            "library copy retains typography and objects");
+        var show = new Show { ServiceItems = [] };
+        library.AddToShow(show, deck.Id);
+        show.Presentations[0].Slides[0].Elements![1].FillColorHex = "#000000FF";
+        Check(library.Presentations[0].Slides[0].Elements![1].FillColorHex == "#FFAA00FF",
+            "show snapshot does not modify the library layout");
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pshow");
+        try
+        {
+            ShowFiles.Save(path, show);
+            Check(ShowFiles.Load(path).Presentations[0].Slides[0].Elements?[1].ShapeKind == "ellipse",
+                "ellipse survives a show save");
+        }
+        finally { File.Delete(path); }
+    }),
     ("folders organize the library without changing show snapshots", () =>
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
@@ -412,7 +446,7 @@ var cases = new (string Name, Action Run)[]
         }
         finally { File.Delete(path); }
     }),
-    ("MxU positioned text and rectangles use the Mac canvas geometry", () =>
+    ("MxU positioned text and shapes use the Mac canvas geometry", () =>
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
         try
@@ -426,6 +460,10 @@ var cases = new (string Name, Action Run)[]
             Check(importedElements[1].Text == "Hello" && importedElements[1].X == 120 &&
                 importedElements[1].TextStyle?.FontSize == 48, "positioned text and style imported");
             Check(slide.Text == "Hello", "text summary remains available");
+            File.WriteAllText(path, """{"slides":[{"objects":[{"objectKind":"shape","shapeKind":"ellipse","x":100,"y":200,"width":400,"height":200,"fill":{"fillKind":"solid","colorHex":"#FFFFFFFF"}}]}]}""");
+            var ellipse = MxuPresentationImport.Load(path).Slides[0].Elements![0];
+            Check(ellipse.ShapeKind == "ellipse" && ellipse.X == 50 && ellipse.Height == 100,
+                "Mac ellipse imports with scaled geometry");
             File.WriteAllText(path, """{"slides":[{"objects":[{"objectKind":"text","text":"No coordinates"},{"objectKind":"shape","shapeKind":"rectangle","x":0,"y":0,"width":100,"height":100,"fill":{"fillKind":"solid","colorHex":"#FFFFFFFF"}}]}]}""");
             var fallback = MxuPresentationImport.Load(path).Slides[0];
             Check(fallback.Elements is null && fallback.Text == "No coordinates",

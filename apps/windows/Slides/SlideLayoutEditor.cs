@@ -15,6 +15,7 @@ public sealed class SlideLayoutEditor : Window
     private readonly Slide _previewSlide;
     private readonly ListBox _objects = new() { Width = 185, DisplayMemberPath = nameof(SlideElement.Name) };
     private readonly SlideSurface _preview = new() { Width = 960, Height = 540 };
+    private readonly Canvas _handles = new() { Width = 960, Height = 540, ClipToBounds = true };
     private readonly TextBox _name = Field();
     private readonly TextBox _text = Field();
     private readonly TextBox _x = Field();
@@ -24,6 +25,7 @@ public sealed class SlideLayoutEditor : Window
     private readonly TextBox _fill = Field();
     private readonly TextBox _corner = Field();
     private bool _loading;
+    private bool _dragging;
 
     public List<SlideElement> EditedElements => _elements;
 
@@ -48,7 +50,7 @@ public sealed class SlideLayoutEditor : Window
         var layout = new DockPanel { Margin = new Thickness(18) };
         var header = new TextBlock
         {
-            Text = "Position text and rectangles on the 960 × 540 slide canvas. Objects lower in the list draw in front.",
+            Text = "Drag objects to move them. Drag the green corner to resize. Objects lower in the list draw in front.",
             Foreground = Brushes.LightGray, Margin = new Thickness(0, 0, 0, 14)
         };
         DockPanel.SetDock(header, Dock.Top);
@@ -73,6 +75,7 @@ public sealed class SlideLayoutEditor : Window
         var actions = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
         actions.Children.Add(Button("+ Text", AddText));
         actions.Children.Add(Button("+ Rectangle", AddShape));
+        actions.Children.Add(Button("+ Ellipse", AddEllipse));
         actions.Children.Add(Button("Duplicate", Duplicate));
         actions.Children.Add(Button("Remove", Remove));
         actions.Children.Add(Button("Back", () => Move(-1)));
@@ -89,11 +92,14 @@ public sealed class SlideLayoutEditor : Window
         var right = new DockPanel();
         Grid.SetColumn(right, 1);
         columns.Children.Add(right);
+        var stage = new Grid { Width = 960, Height = 540 };
+        stage.Children.Add(_preview);
+        stage.Children.Add(_handles);
         var preview = new Border
         {
             Height = 270, HorizontalAlignment = HorizontalAlignment.Left,
             Background = Brushes.Black, CornerRadius = new CornerRadius(6),
-            Child = new Viewbox { Width = 480, Height = 270, Child = _preview },
+            Child = new Viewbox { Width = 480, Height = 270, Child = stage },
             Margin = new Thickness(0, 0, 0, 14)
         };
         DockPanel.SetDock(preview, Dock.Top);
@@ -113,7 +119,7 @@ public sealed class SlideLayoutEditor : Window
         AddNumber(position, "Width", _width);
         AddNumber(position, "Height", _height);
         fields.Children.Add(position);
-        fields.Children.Add(Label("Rectangle fill (#RRGGBB or #RRGGBBAA)"));
+        fields.Children.Add(Label("Shape fill (#RRGGBB or #RRGGBBAA)"));
         fields.Children.Add(_fill);
         fields.Children.Add(Label("Corner radius"));
         fields.Children.Add(_corner);
@@ -177,6 +183,7 @@ public sealed class SlideLayoutEditor : Window
         _fill.Text = item?.FillColorHex ?? "";
         _corner.Text = Number(item?.CornerRadius);
         _loading = false;
+        if (!_dragging) RefreshHandles();
     }
 
     private static string Number(double? value) => value?.ToString(CultureInfo.InvariantCulture) ?? "";
@@ -203,8 +210,96 @@ public sealed class SlideLayoutEditor : Window
 
     private void RefreshPreview()
     {
-        try { SlideLayout.Validate(_elements); _preview.Show(_previewSlide, false); }
+        try
+        {
+            SlideLayout.Validate(_elements);
+            _preview.Show(_previewSlide, false);
+            if (!_dragging) RefreshHandles();
+        }
         catch (ArgumentException) { }
+    }
+
+    private void RefreshHandles()
+    {
+        _handles.Children.Clear();
+        foreach (var item in _elements)
+        {
+            if (!double.IsFinite(item.X) || !double.IsFinite(item.Y) ||
+                !double.IsFinite(item.Width) || !double.IsFinite(item.Height)) continue;
+            var selected = ReferenceEquals(_objects.SelectedItem, item);
+            var move = Handle(Math.Max(12, item.Width), Math.Max(12, item.Height),
+                selected ? Brush("#30D158") : Brush("#66FFFFFF"), 2);
+            Canvas.SetLeft(move, item.X);
+            Canvas.SetTop(move, item.Y);
+            move.ToolTip = "Drag to move";
+            Thumb? resize = null;
+            move.DragStarted += (_, _) =>
+            {
+                _dragging = true;
+                _objects.SelectedItem = item;
+            };
+            move.DragDelta += (_, args) =>
+            {
+                Drag(item, args.HorizontalChange, args.VerticalChange, false, move);
+                if (resize is not null)
+                {
+                    Canvas.SetLeft(resize, item.X + item.Width - 9);
+                    Canvas.SetTop(resize, item.Y + item.Height - 9);
+                }
+            };
+            move.DragCompleted += (_, _) => { _dragging = false; RefreshPreview(); };
+            _handles.Children.Add(move);
+            if (!selected) continue;
+            resize = Handle(18, 18, Brush("#30D158"), 2);
+            Canvas.SetLeft(resize, item.X + item.Width - 9);
+            Canvas.SetTop(resize, item.Y + item.Height - 9);
+            resize.ToolTip = "Drag to resize";
+            resize.DragStarted += (_, _) => _dragging = true;
+            resize.DragDelta += (_, args) =>
+            {
+                Drag(item, args.HorizontalChange, args.VerticalChange, true, resize!);
+                move.Width = item.Width;
+                move.Height = item.Height;
+            };
+            resize.DragCompleted += (_, _) => { _dragging = false; RefreshPreview(); };
+            _handles.Children.Add(resize);
+        }
+    }
+
+    private static Thumb Handle(double width, double height, Brush outline, double thickness)
+    {
+        var border = new FrameworkElementFactory(typeof(Border));
+        border.SetValue(Border.BackgroundProperty, Brushes.Transparent);
+        border.SetValue(Border.BorderBrushProperty, outline);
+        border.SetValue(Border.BorderThicknessProperty, new Thickness(thickness));
+        return new Thumb
+        {
+            Width = width, Height = height,
+            Template = new ControlTemplate(typeof(Thumb)) { VisualTree = border }
+        };
+    }
+
+    private void Drag(SlideElement item, double dx, double dy, bool resizing, Thumb handle)
+    {
+        if (resizing)
+        {
+            SlideLayout.Resize(item, dx, dy);
+            Canvas.SetLeft(handle, item.X + item.Width - 9);
+            Canvas.SetTop(handle, item.Y + item.Height - 9);
+        }
+        else
+        {
+            SlideLayout.Translate(item, dx, dy);
+            Canvas.SetLeft(handle, item.X);
+            Canvas.SetTop(handle, item.Y);
+        }
+        _loading = true;
+        _x.Text = Number(item.X);
+        _y.Text = Number(item.Y);
+        _width.Text = Number(item.Width);
+        _height.Text = Number(item.Height);
+        _loading = false;
+        _preview.Show(_previewSlide, false);
     }
 
     private void RefreshObjectList()
@@ -225,6 +320,14 @@ public sealed class SlideLayoutEditor : Window
     private void AddShape()
     {
         var item = SlideLayout.AddShape(_elements);
+        _objects.Items.Refresh();
+        _objects.SelectedItem = item;
+        RefreshPreview();
+    }
+
+    private void AddEllipse()
+    {
+        var item = SlideLayout.AddEllipse(_elements);
         _objects.Items.Refresh();
         _objects.SelectedItem = item;
         RefreshPreview();
