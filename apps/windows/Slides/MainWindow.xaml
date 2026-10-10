@@ -98,12 +98,21 @@
       <DockPanel Grid.Row="2">
         <StackPanel DockPanel.Dock="Top" Margin="14,12,14,8">
           <TextBlock Text="Libraries" FontWeight="SemiBold" FontSize="16" />
+          <ComboBox x:Name="FolderFilter" Margin="0,8,0,0" DisplayMemberPath="Name"
+                    SelectionChanged="OnFolderFilterChanged" ToolTip="Browse all items, top level, or a folder" />
           <TextBox x:Name="LibrarySearch" Margin="0,8,0,0" ToolTip="Search the song and slide library" TextChanged="OnLibrarySearchChanged" />
+          <WrapPanel Margin="0,8,0,0">
+            <Button Content="New Folder" Click="NewFolder" />
+            <Button x:Name="RenameFolderButton" Content="Rename" Click="RenameFolder" IsEnabled="False" />
+            <Button x:Name="DeleteFolderButton" Content="Delete" Click="DeleteFolder" IsEnabled="False" />
+          </WrapPanel>
         </StackPanel>
         <WrapPanel DockPanel.Dock="Bottom" Margin="12,8,8,12">
           <Button Content="+ New" Click="AddSong" />
           <Button Content="Add Media" Click="AddMedia" />
           <Button Content="Import MxU" Click="ImportMxu" />
+          <Button Content="Move To" Click="MoveLibraryItem" />
+          <Button Content="Relink Media" Click="RelinkMedia" />
         </WrapPanel>
         <ListBox x:Name="LibraryList" ItemContainerStyle="{StaticResource SidebarItem}"
                  DisplayMemberPath="Name" MouseDoubleClick="OnLibraryDoubleClick" />
