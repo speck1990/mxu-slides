@@ -61,6 +61,19 @@ public enum SongSelectPayload {
                 authors.joined(separator: " | ")
             ] + copyrights).joined(separator: "\n\n")
         }
+
+        public func makePresentation(themeId: String = "", linesPerSlide: Int = 2) throws -> Presentation {
+            var presentation = LyricTextImporter.makePresentation(
+                try importText(), themeId: themeId, linesPerSlide: linesPerSlide
+            )
+            var ccli = presentation.ccli ?? CCLIInfo()
+            ccli.songNumber = Int(songNumber)
+            ccli.songTitle = title
+            ccli.author = authors.joined(separator: " | ")
+            ccli.copyright = copyrights.joined(separator: "\n")
+            presentation.ccli = ccli
+            return presentation
+        }
     }
 
     public struct Part: Decodable, Sendable {

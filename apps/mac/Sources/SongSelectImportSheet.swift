@@ -80,11 +80,7 @@ struct SongSelectImportSheet: View {
         do {
             status = "Importing…"
             let lyrics = try await client.lyrics(for: song.id)
-            let text = try lyrics.importText()
-            guard let id = model.importLyrics(text: text) else {
-                status = "Could not save this song."
-                return
-            }
+            let id = try model.importSongSelect(lyrics)
             dismiss()
             onImported(id)
         } catch { status = error.localizedDescription }

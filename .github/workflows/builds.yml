@@ -118,4 +118,4 @@ jobs:
           retention-days: 30
       - name: Report failure
         if: failure()
-        run: echo "macOS build failed. Check the failing step and its Xcode output in this run." >> "$GITHUB_STEP_SUMMARY"
+        run: echo "macOS build or test failed. Check the failing step and its output in this run." >> "$GITHUB_STEP_SUMMARY"
