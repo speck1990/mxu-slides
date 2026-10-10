@@ -84,6 +84,7 @@
           <WrapPanel>
             <Button Content="+ Add Item" Click="AddLibrarySelection" />
             <Button Content="New Song" Click="AddSong" />
+            <Button Content="New Deck" Click="AddDeck" />
           </WrapPanel>
           <WrapPanel Margin="0,7,0,0">
             <Button Content="↑" ToolTip="Move earlier" Click="MoveServiceUp" />
@@ -109,6 +110,7 @@
         </StackPanel>
         <WrapPanel DockPanel.Dock="Bottom" Margin="12,8,8,12">
           <Button Content="+ New" Click="AddSong" />
+          <Button Content="New Deck" Click="AddDeck" />
           <Button Content="Add Media" Click="AddMedia" />
           <Button Content="Import MxU" Click="ImportMxu" />
           <Button Content="Move To" Click="MoveLibraryItem" />
@@ -120,16 +122,19 @@
     </Grid>
     <Border Grid.Column="1" BorderBrush="{StaticResource Line}" BorderThickness="1,0">
       <DockPanel>
-        <Grid DockPanel.Dock="Top" Height="54" Margin="16,0">
-          <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+        <Grid DockPanel.Dock="Top" Height="82" Margin="16,0">
+          <Grid.RowDefinitions><RowDefinition Height="34"/><RowDefinition Height="*"/></Grid.RowDefinitions>
           <TextBlock x:Name="SelectionTitle" Text="Select an item in Service Flow" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+          <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
             <Button Content="Edit Song" Click="EditSong" />
+            <Button Content="Edit Slides" Click="EditSlides" />
             <Button Content="New Show" Click="NewShow" />
             <Button Content="Open Show" Click="OpenShow" />
             <Button Content="Save As" Click="SaveShowAs" />
             <Button Content="Pack Show" Click="PackShow" ToolTip="Save a portable show with its media" />
-          </StackPanel>
+            </StackPanel>
+          </ScrollViewer>
         </Grid>
         <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource Line}" />
         <ListBox x:Name="Slides" Margin="15,16,0,0" ItemContainerStyle="{StaticResource SlideItem}"

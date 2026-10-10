@@ -100,6 +100,57 @@ var cases = new (string Name, Action Run)[]
         }
         finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
     }),
+    ("slide editor keeps source untouched and persists deck changes", () =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var media = Path.Combine(folder, "background.png");
+            File.WriteAllBytes(media, [1, 2, 3]);
+            var original = PresentationEditing.NewDeck();
+            var draft = PresentationEditing.Copy(original);
+            draft.Name = "Sunday welcome";
+            draft.Slides[0].Text = "Welcome";
+            draft.Slides[0].Background = "#123456FF";
+            var mediaSlide = PresentationEditing.AddSlide(draft, media);
+            mediaSlide.Text = "Join us";
+            var duplicate = PresentationEditing.DuplicateSlide(draft, 0);
+            Check(duplicate.Id != draft.Slides[0].Id && duplicate.Text == "Welcome", "duplicate is independent");
+            PresentationEditing.MoveSlide(draft, 2, 0);
+            draft.Slides.RemoveAt(1);
+            PresentationEditing.Validate(draft);
+            Check(original.Slides.Count == 1 && original.Slides[0].Text == "", "cancel can discard draft");
+            Check(draft.Slides.Select(slide => slide.Id).SequenceEqual([mediaSlide.Id, duplicate.Id]), "slide order and removal");
+
+            var show = new Show { Presentations = [draft], ServiceItems = [draft.Id, draft.Id] };
+            var path = Path.Combine(folder, "show.pshow");
+            ShowFiles.Save(path, show);
+            var reopened = ShowFiles.Load(path);
+            Check(reopened.ServiceItems!.Count == 2 && reopened.Presentations[0].Slides[0].MediaPath == media,
+                "edited deck and repeated service references persist");
+            Check(reopened.Presentations[0].Slides[1].Background == "#123456FF", "background persists");
+            var library = new PresentationLibrary();
+            library.Upsert(draft);
+            Check(library.Presentations[0].Slides.Count == 2, "edited deck can update library");
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }),
+    ("slide editor rejects invalid or missing slide content", () =>
+    {
+        var deck = PresentationEditing.NewDeck();
+        deck.Slides[0].Background = "blue";
+        try { PresentationEditing.Validate(deck); throw new Exception("FAIL invalid color accepted"); }
+        catch (ArgumentException) { }
+        deck.Slides[0].Background = "#123456";
+        deck.Slides[0].MediaPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".png");
+        try { PresentationEditing.Validate(deck); throw new Exception("FAIL missing media accepted"); }
+        catch (FileNotFoundException) { }
+        deck.Slides[0].MediaPath = null;
+        deck.Slides.Clear();
+        try { PresentationEditing.Validate(deck); throw new Exception("FAIL empty deck accepted"); }
+        catch (ArgumentException) { }
+    }),
     ("folders organize the library without changing show snapshots", () =>
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
