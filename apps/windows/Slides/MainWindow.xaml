@@ -1,0 +1,65 @@
+<Window x:Class="Slides.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Slides"
+        Title="Slides" Width="1250" Height="760" MinWidth="850" MinHeight="520"
+        Background="#101827" Foreground="#E8EEF8" FontFamily="Segoe UI"
+        PreviewKeyDown="OnPreviewKeyDown" Closing="OnClosing">
+  <Window.Resources>
+    <Style TargetType="Button">
+      <Setter Property="Background" Value="#23344D" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderBrush" Value="#344866" />
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="Margin" Value="0,0,8,0" />
+    </Style>
+    <Style TargetType="ListBox">
+      <Setter Property="Background" Value="#18243A" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="FontSize" Value="16" />
+    </Style>
+  </Window.Resources>
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="18,16,18,12">
+      <TextBlock Text="SLIDES" FontSize="22" FontWeight="Bold" Foreground="#77B7FF" Margin="0,0,28,0" VerticalAlignment="Center" />
+      <Button Content="Add song" Click="AddSong" />
+      <Button Content="Edit song" Click="EditSong" />
+      <Button Content="Remove" Click="RemovePresentation" />
+      <Button Content="Add image / video" Click="AddMedia" />
+      <Button Content="Import MxU JSON" Click="ImportMxu" />
+      <Button Content="Open show" Click="OpenShow" />
+      <Button Content="Save show as" Click="SaveShowAs" />
+    </StackPanel>
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="18,12,18,16">
+      <TextBlock Text="Audience display" VerticalAlignment="Center" Margin="0,0,10,0" />
+      <ComboBox x:Name="DisplaySelector" Width="240" Margin="0,0,8,0" />
+      <Button x:Name="ProjectButton" Content="Start projection  (F5)" Click="ToggleProjection" />
+      <Button Content="Black screen  (B)" Click="ToggleBlack" />
+      <Button Content="Previous  (←)" Click="Previous" />
+      <Button Content="Next  (→)" Click="Next" />
+      <TextBlock x:Name="Status" VerticalAlignment="Center" Margin="12,0,0,0" Foreground="#AFC0D9" />
+    </StackPanel>
+    <Grid Margin="18,0,18,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="230" />
+        <ColumnDefinition Width="230" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+      <DockPanel Grid.Column="0" Margin="0,0,12,0">
+        <TextBlock DockPanel.Dock="Top" Text="SONGS AND DECKS" FontSize="13" FontWeight="Bold" Foreground="#AFC0D9" Margin="0,0,0,10" />
+        <ListBox x:Name="Presentations" DisplayMemberPath="Name" SelectionChanged="OnPresentationChanged" />
+      </DockPanel>
+      <DockPanel Grid.Column="1" Margin="0,0,12,0">
+        <TextBlock DockPanel.Dock="Top" Text="SLIDES" FontSize="13" FontWeight="Bold" Foreground="#AFC0D9" Margin="0,0,0,10" />
+        <ListBox x:Name="Slides" DisplayMemberPath="Name" SelectionChanged="OnSlideChanged" />
+      </DockPanel>
+      <DockPanel Grid.Column="2">
+        <TextBlock DockPanel.Dock="Top" Text="OUTPUT PREVIEW" FontSize="13" FontWeight="Bold" Foreground="#AFC0D9" Margin="0,0,0,10" />
+        <Border Background="Black" BorderBrush="#344866" BorderThickness="1">
+          <Viewbox Stretch="Uniform"><local:SlideSurface x:Name="Preview" Width="960" Height="540" /></Viewbox>
+        </Border>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</Window>
