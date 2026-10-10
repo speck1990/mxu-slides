@@ -71,6 +71,8 @@ public static class ShowFiles
             ?? throw new InvalidDataException("The show file is empty.");
         if (show.Version != 1 || show.Presentations is null)
             throw new InvalidDataException("Unsupported show file version.");
+        foreach (var presentation in show.Presentations)
+            SongParser.RepairLegacyHeadings(presentation);
         show.EnsureServiceItems();
         return show;
     }

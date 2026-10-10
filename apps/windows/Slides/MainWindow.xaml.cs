@@ -124,7 +124,7 @@ public partial class MainWindow : Window
     private void EditSong(object sender, RoutedEventArgs e)
     {
         if (SelectedPresentation is not { Kind: "song" } selected) return;
-        var editor = new SongEditor(selected.Name, string.Join("\n\n", selected.Slides.Select(slide => slide.Text))) { Owner = this };
+        var editor = new SongEditor(selected.Name, SongParser.ToEditableLyrics(selected)) { Owner = this };
         if (editor.ShowDialog() != true) return;
         Try(() =>
         {
