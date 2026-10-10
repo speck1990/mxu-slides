@@ -65,4 +65,5 @@ jobs:
       - name: Report failure
         if: failure()
         shell: pwsh
-        run: Add-Content $env:GITHUB_STEP_SUMMARY "Windows build failed. Open the failing step in this run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+        run: |
+          Add-Content $env:GITHUB_STEP_SUMMARY "Windows build failed. Open the failing step in this run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
