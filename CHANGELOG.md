@@ -4,6 +4,9 @@
 
 ### Added
 
+- Microsoft Defender scanning and a SHA-256 record for Windows CI downloads.
+- Recognize unbracketed song section headings on Windows, repair headings saved by earlier Windows builds, and preserve section labels when editing songs.
+- Windows workspace with separate show-scoped library and ordered service flow, slide thumbnails, Mac-style panel layout, and backward-compatible `.pshow` loading.
 - Personal Windows preview under the distinct **Slides** name, including `Slides.exe` and a matching build artifact.
 - Repeatable macOS debug build, local installation, and launch script with a Codex Run action.
 - Concurrent Windows and Apple silicon macOS GitHub Actions builds with downloadable artifacts and the required license notice.

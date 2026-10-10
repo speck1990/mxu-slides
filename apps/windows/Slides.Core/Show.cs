@@ -7,6 +7,35 @@ public sealed class Show
 {
     public int Version { get; set; } = 1;
     public List<Presentation> Presentations { get; set; } = [];
+    // Null identifies shows saved before the library and service were separated.
+    public List<string>? ServiceItems { get; set; }
+
+    public void EnsureServiceItems() =>
+        ServiceItems ??= Presentations.Select(presentation => presentation.Id).ToList();
+
+    public void AddToService(string presentationId)
+    {
+        EnsureServiceItems();
+        if (!Presentations.Any(presentation => presentation.Id == presentationId))
+            throw new ArgumentException("Choose a presentation from the library.", nameof(presentationId));
+        ServiceItems!.Add(presentationId);
+    }
+
+    public void RemoveFromService(int index)
+    {
+        EnsureServiceItems();
+        ServiceItems!.RemoveAt(index);
+    }
+
+    public void MoveServiceItem(int from, int to)
+    {
+        EnsureServiceItems();
+        var items = ServiceItems!;
+        if (from < 0 || from >= items.Count || to < 0 || to >= items.Count) return;
+        var id = items[from];
+        items.RemoveAt(from);
+        items.Insert(to, id);
+    }
 }
 
 public sealed class Presentation
@@ -42,11 +71,15 @@ public static class ShowFiles
             ?? throw new InvalidDataException("The show file is empty.");
         if (show.Version != 1 || show.Presentations is null)
             throw new InvalidDataException("Unsupported show file version.");
+        foreach (var presentation in show.Presentations)
+            SongParser.RepairLegacyHeadings(presentation);
+        show.EnsureServiceItems();
         return show;
     }
 
     public static void Save(string path, Show show)
     {
+        show.EnsureServiceItems();
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(show, Json));

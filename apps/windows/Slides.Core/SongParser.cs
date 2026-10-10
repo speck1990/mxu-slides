@@ -7,6 +7,19 @@ public static partial class SongParser
     [GeneratedRegex(@"^\s*\[([^\]]+)\]\s*$", RegexOptions.Compiled)]
     private static partial Regex SectionHeader();
 
+    [GeneratedRegex(@"^(?:Verse|Chorus|Pre[- ]?Chorus|Bridge|Intro|Outro|Tag|Refrain|Ending|Instrumental|Interlude|Vamp|Turnaround)(?:\s+[1-9]\d*)?:?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex BareSectionHeader();
+
+    [GeneratedRegex(@"^Verse [1-9]\d*$", RegexOptions.CultureInvariant)]
+    private static partial Regex LegacyVerseName();
+
+    private static string? HeaderName(string line)
+    {
+        var bracketed = SectionHeader().Match(line);
+        if (bracketed.Success) return bracketed.Groups[1].Value.Trim();
+        return BareSectionHeader().IsMatch(line) ? line.TrimEnd(':') : null;
+    }
+
     public static Presentation Parse(string title, string lyrics)
     {
         if (string.IsNullOrWhiteSpace(title))
@@ -16,15 +29,19 @@ public static partial class SongParser
         var lines = lyrics.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
         var stanza = new List<string>();
         var section = "Verse";
-        var count = 0;
+        var sectionSlide = 0;
+        var unlabelledVerse = 0;
+        var hasHeading = false;
 
         void Flush()
         {
             if (stanza.Count == 0) return;
-            count++;
+            sectionSlide++;
             presentation.Slides.Add(new Slide
             {
-                Name = $"{section} {count}",
+                Name = hasHeading
+                    ? sectionSlide == 1 ? section : $"{section} ({sectionSlide})"
+                    : $"Verse {++unlabelledVerse}",
                 Text = string.Join("\n", stanza)
             });
             stanza.Clear();
@@ -33,12 +50,13 @@ public static partial class SongParser
         foreach (var raw in lines)
         {
             var line = raw.Trim();
-            var header = SectionHeader().Match(line);
-            if (header.Success)
+            var header = HeaderName(line);
+            if (header is not null)
             {
                 Flush();
-                section = header.Groups[1].Value.Trim();
-                count = 0;
+                section = header;
+                sectionSlide = 0;
+                hasHeading = true;
             }
             else if (line.Length == 0) Flush();
             else stanza.Add(line);
@@ -47,5 +65,26 @@ public static partial class SongParser
         if (presentation.Slides.Count == 0)
             throw new ArgumentException("Add at least one line of lyrics.", nameof(lyrics));
         return presentation;
+    }
+
+    public static string ToEditableLyrics(Presentation song) =>
+        string.Join("\n\n", song.Slides.Select(slide => $"[{slide.Name}]\n{slide.Text}"));
+
+    // Early Windows builds treated bare headings as lyrics and numbered every slide Verse N.
+    // Repair only that exact legacy shape when an existing show is opened.
+    public static void RepairLegacyHeadings(Presentation song)
+    {
+        if (song.Kind != "song") return;
+        foreach (var slide in song.Slides)
+        {
+            if (!LegacyVerseName().IsMatch(slide.Name)) continue;
+            var newline = slide.Text.IndexOf('\n');
+            if (newline < 0) continue;
+            var heading = HeaderName(slide.Text[..newline].Trim());
+            var lyrics = slide.Text[(newline + 1)..].Trim();
+            if (heading is null || lyrics.Length == 0) continue;
+            slide.Name = heading;
+            slide.Text = lyrics;
+        }
     }
 }

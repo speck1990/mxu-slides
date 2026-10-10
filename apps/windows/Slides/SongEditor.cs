@@ -46,7 +46,7 @@ public sealed class SongEditor : Window
         var heading = new StackPanel();
         heading.Children.Add(new TextBlock { Text = "Song title" });
         heading.Children.Add(_title);
-        heading.Children.Add(new TextBlock { Text = "Lyrics — separate slides with blank lines; use [Chorus] or [Verse] headings." });
+        heading.Children.Add(new TextBlock { Text = "Lyrics — separate slides with blank lines. Use Verse 1, Chorus, or [Bridge] headings." });
         DockPanel.SetDock(heading, Dock.Top);
         layout.Children.Add(heading);
         layout.Children.Add(_lyrics);

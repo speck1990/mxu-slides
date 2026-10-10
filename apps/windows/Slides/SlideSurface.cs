@@ -11,7 +11,28 @@ namespace Slides;
 
 public sealed class SlideSurface : Grid
 {
+    public static readonly DependencyProperty CurrentSlideProperty = DependencyProperty.Register(
+        nameof(CurrentSlide), typeof(Slide), typeof(SlideSurface),
+        new PropertyMetadata(null, (target, _) => ((SlideSurface)target).Refresh()));
+
+    public static readonly DependencyProperty IsThumbnailProperty = DependencyProperty.Register(
+        nameof(IsThumbnail), typeof(bool), typeof(SlideSurface),
+        new PropertyMetadata(false, (target, _) => ((SlideSurface)target).Refresh()));
+
+    public Slide? CurrentSlide
+    {
+        get => (Slide?)GetValue(CurrentSlideProperty);
+        set => SetValue(CurrentSlideProperty, value);
+    }
+
+    public bool IsThumbnail
+    {
+        get => (bool)GetValue(IsThumbnailProperty);
+        set => SetValue(IsThumbnailProperty, value);
+    }
+
     private MediaElement? _video;
+    private bool _black;
     private readonly TextBlock _text = new()
     {
         Foreground = Brushes.White,
@@ -26,8 +47,11 @@ public sealed class SlideSurface : Grid
 
     public SlideSurface() => Show(null, false);
 
+    private void Refresh() => Show(CurrentSlide, _black);
+
     public void Show(Slide? slide, bool black)
     {
+        _black = black;
         _video?.Stop();
         _video = null;
         Children.Clear();
@@ -51,16 +75,30 @@ public sealed class SlideSurface : Grid
             }
             else
             {
-                _video = new MediaElement
+                if (IsThumbnail)
                 {
-                    Source = uri,
-                    LoadedBehavior = MediaState.Manual,
-                    UnloadedBehavior = MediaState.Stop,
-                    Stretch = Stretch.UniformToFill
-                };
-                _video.MediaEnded += (_, _) => { _video.Position = TimeSpan.Zero; _video.Play(); };
-                Children.Add(_video);
-                _video.Play();
+                    Children.Add(new TextBlock
+                    {
+                        Text = "▶",
+                        FontSize = 110,
+                        Foreground = Brushes.White,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    });
+                }
+                else
+                {
+                    _video = new MediaElement
+                    {
+                        Source = uri,
+                        LoadedBehavior = MediaState.Manual,
+                        UnloadedBehavior = MediaState.Stop,
+                        Stretch = Stretch.UniformToFill
+                    };
+                    _video.MediaEnded += (_, _) => { _video.Position = TimeSpan.Zero; _video.Play(); };
+                    Children.Add(_video);
+                    _video.Play();
+                }
             }
         }
         _text.Text = slide?.Text ?? "Select a slide";
