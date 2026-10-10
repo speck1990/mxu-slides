@@ -2,7 +2,7 @@ name: Slides builds
 
 on:
   push:
-    branches: [main, 'windows/**', 'mac/**']
+    branches: [main, 'windows/**', 'mac/**', 'feature/**']
     paths:
       - 'apps/windows/**'
       - 'apps/mac/**'
@@ -74,7 +74,7 @@ jobs:
 
   mac:
     runs-on: macos-26
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -93,6 +93,8 @@ jobs:
             -destination 'generic/platform=macOS' -derivedDataPath "$RUNNER_TEMP/SlidesDerivedData" \
             -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
             -jobs 4 build 2>&1 | tee "$RUNNER_TEMP/slides-mac-build.log" | tail -n 120
+      - name: Test SongSelect payload import
+        run: swift test --package-path apps/mac/Packages/PresenterCore --filter SongSelectPayloadTests
       - name: Package macOS download with license
         run: |
           app="$RUNNER_TEMP/SlidesDerivedData/Build/Products/Debug/Slides.app"

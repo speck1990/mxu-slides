@@ -1590,6 +1590,7 @@ private struct ImportLyricsSheet: View {
     @State private var text = ""
     @State private var title = ""
     @State private var linesPerSlide = 2
+    @State private var importingSongSelect = false
 
     private var themeId: String { model.slideBuilding.lyricsImportThemeId ?? "" }
 
@@ -1618,6 +1619,7 @@ private struct ImportLyricsSheet: View {
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
             HStack {
                 Button("Load File…", action: loadFile)
+                Button("Search SongSelect…") { importingSongSelect = true }
                 if let detected {
                     Text(formatCaption(detected))
                         .font(.callout)
@@ -1642,6 +1644,9 @@ private struct ImportLyricsSheet: View {
         }
         .padding(16)
         .frame(width: 520)
+        .sheet(isPresented: $importingSongSelect) {
+            SongSelectImportSheet(model: model, onImported: onImported)
+        }
     }
 
     private func formatCaption(_ format: LyricTextFormat) -> String {

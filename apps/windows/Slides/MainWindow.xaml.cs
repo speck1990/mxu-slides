@@ -56,6 +56,17 @@ public partial class MainWindow : Window
         });
     }
 
+    private void ImportSongSelect(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SongSelectWindow { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.ImportedSong is null) return;
+        Try(() =>
+        {
+            _show.Presentations.Add(dialog.ImportedSong);
+            Changed(_show.Presentations.Count - 1);
+        });
+    }
+
     private void EditSong(object sender, RoutedEventArgs e)
     {
         if (Presentations.SelectedItem is not Presentation selected || selected.Kind != "song") return;
@@ -65,6 +76,8 @@ public partial class MainWindow : Window
         {
             var replacement = SongParser.Parse(editor.SongTitle, editor.Lyrics);
             replacement.Id = selected.Id;
+            replacement.CcliSongNumber = selected.CcliSongNumber;
+            replacement.Copyright = selected.Copyright;
             var index = Presentations.SelectedIndex;
             _show.Presentations[index] = replacement;
             Changed(index);

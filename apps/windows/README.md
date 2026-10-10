@@ -5,6 +5,7 @@ Personal Windows port of MxU Slides. It keeps the original source history and li
 ## Preview features
 
 - Paste lyrics into **Add song**. Blank lines divide slides; `[Verse]` and `[Chorus]` mark sections. Songs can be edited or removed from the current show.
+- **SongSelect** opens browser sign-in, searches by title or CCLI number, and imports licensed lyrics with section labels, CCLI number, and copyright. This requires CCLI partner API access; enter the partner client ID and subscription key in the dialog or set `SLIDES_CCLI_CLIENT_ID` and `SLIDES_CCLI_SUBSCRIPTION_KEY`. Register `http://127.0.0.1:8765/callback/` with CCLI as the OAuth redirect URI. Keys and session tokens are kept in memory only.
 - Add a local image or video as a slide. Playback uses Windows media codecs and works without a network connection.
 - Import a standalone MxU Presentation JSON file. The preview reads visible text objects and solid slide backgrounds. It does not import the macOS library database or advanced slide designs.
 - Choose an audience display and start fullscreen projection with F5. Use Left/Right to navigate and B to black out. Shows autosave under `%LOCALAPPDATA%\Slides` and can be opened or saved as `.pshow` files.

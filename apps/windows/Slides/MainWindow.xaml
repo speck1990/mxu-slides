@@ -24,6 +24,7 @@
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="18,16,18,12">
       <TextBlock Text="SLIDES" FontSize="22" FontWeight="Bold" Foreground="#77B7FF" Margin="0,0,28,0" VerticalAlignment="Center" />
       <Button Content="Add song" Click="AddSong" />
+      <Button Content="SongSelect" Click="ImportSongSelect" />
       <Button Content="Edit song" Click="EditSong" />
       <Button Content="Remove" Click="RemovePresentation" />
       <Button Content="Add image / video" Click="AddMedia" />

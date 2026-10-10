@@ -14,6 +14,8 @@ public sealed class Presentation
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "Untitled";
     public string Kind { get; set; } = "song";
+    public int? CcliSongNumber { get; set; }
+    public string? Copyright { get; set; }
     public List<Slide> Slides { get; set; } = [];
 }
 
