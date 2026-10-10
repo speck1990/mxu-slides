@@ -11,7 +11,7 @@ Personal Windows port of MxU Slides. It keeps the original source history and li
 
 ## Download and run
 
-Open the [Windows build workflow](../../actions/workflows/windows.yml), choose a successful run, and download the `Slides-win-x64` artifact. Extract it and run `Slides.exe`; keep all extracted files in the same folder. No .NET installation or manual compilation is required. The executable is unsigned, so Windows may ask you to confirm it on first launch. For a new build, select **Run workflow**. A prerelease zip can be produced by enabling the `prerelease` option for a manual run after checking distribution rights.
+Open the [build workflow](../../actions/workflows/builds.yml), choose a successful run, and download the `Slides-win-x64` artifact. Extract it and run `Slides.exe`; keep all extracted files in the same folder. No .NET installation or manual compilation is required. The executable is unsigned, so Windows may ask you to confirm it on first launch. For a new build, select **Run workflow**. A prerelease zip can be produced by enabling the `prerelease` option for a manual run after checking distribution rights.
 
 ## Developer commands
 

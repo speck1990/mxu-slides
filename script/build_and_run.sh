@@ -5,10 +5,10 @@ MODE="${1:-run}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MAC_ROOT="$REPO_ROOT/apps/mac"
 BUILD_ROOT="$MAC_ROOT/build/LocalInstall"
-BUILT_APP="$BUILD_ROOT/Build/Products/Debug/MxU Slides.app"
+BUILT_APP="$BUILD_ROOT/Build/Products/Debug/Slides.app"
 INSTALL_DIR="${HOME}/Applications"
-INSTALLED_APP="$INSTALL_DIR/MxU Slides.app"
-APP_BINARY="$INSTALLED_APP/Contents/MacOS/MxU Slides"
+INSTALLED_APP="$INSTALL_DIR/Slides.app"
+APP_BINARY="$INSTALLED_APP/Contents/MacOS/Slides"
 
 if [[ "$(uname -s)" != "Darwin" ]]; then
   echo "This installer must run on the local Mac." >&2
@@ -21,7 +21,7 @@ if ! command -v xcodegen >/dev/null; then
   brew install xcodegen
 fi
 
-pkill -x "MxU Slides" >/dev/null 2>&1 || true
+pkill -x "Slides" >/dev/null 2>&1 || true
 (
   cd "$MAC_ROOT"
   xcodegen generate
@@ -43,7 +43,7 @@ case "$MODE" in
     ;;
   --logs|logs)
     /usr/bin/open -n "$INSTALLED_APP"
-    /usr/bin/log stream --info --style compact --predicate 'process == "MxU Slides"'
+    /usr/bin/log stream --info --style compact --predicate 'process == "Slides"'
     ;;
   --telemetry|telemetry)
     /usr/bin/open -n "$INSTALLED_APP"
@@ -52,7 +52,7 @@ case "$MODE" in
   --verify|verify)
     /usr/bin/open -n "$INSTALLED_APP"
     sleep 2
-    pgrep -x "MxU Slides" >/dev/null
+    pgrep -x "Slides" >/dev/null
     ;;
   *)
     echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2

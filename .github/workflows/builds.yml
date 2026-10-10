@@ -1,18 +1,22 @@
-name: Windows build
+name: Slides builds
 
 on:
   push:
-    branches: [main, 'windows/**']
+    branches: [main, 'windows/**', 'mac/**']
     paths:
       - 'apps/windows/**'
+      - 'apps/mac/**'
       - 'packages/schema/documents.json'
-      - '.github/workflows/windows.yml'
+      - '.github/workflows/builds.yml'
+      - 'script/build_and_run.sh'
       - 'LICENSE.md'
   pull_request:
     paths:
       - 'apps/windows/**'
+      - 'apps/mac/**'
       - 'packages/schema/documents.json'
-      - '.github/workflows/windows.yml'
+      - '.github/workflows/builds.yml'
+      - 'script/build_and_run.sh'
   workflow_dispatch:
     inputs:
       prerelease:
@@ -25,7 +29,7 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  windows:
     runs-on: windows-2022
     permissions:
       contents: write
@@ -67,3 +71,44 @@ jobs:
         shell: pwsh
         run: |
           Add-Content $env:GITHUB_STEP_SUMMARY "Windows build failed. Open the failing step in this run: $env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+
+  mac:
+    runs-on: macos-26
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check Xcode and install XcodeGen
+        run: |
+          xcodebuild -version
+          if ! command -v xcodegen >/dev/null; then brew install xcodegen; fi
+      - name: Generate and build macOS app
+        working-directory: apps/mac
+        run: |
+          set -o pipefail
+          xcodegen generate
+          xcodebuild -project MxUSlides.xcodeproj -scheme MxUSlides -configuration Debug \
+            -destination 'generic/platform=macOS' -derivedDataPath "$RUNNER_TEMP/SlidesDerivedData" \
+            -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
+            -jobs 4 build 2>&1 | tee "$RUNNER_TEMP/slides-mac-build.log" | tail -n 120
+      - name: Package macOS download with license
+        run: |
+          app="$RUNNER_TEMP/SlidesDerivedData/Build/Products/Debug/Slides.app"
+          test -f "$app/Contents/MacOS/Slides"
+          lipo -archs "$app/Contents/MacOS/Slides" | grep -q arm64
+          mkdir -p "$RUNNER_TEMP/Slides-mac-arm64" artifacts
+          ditto "$app" "$RUNNER_TEMP/Slides-mac-arm64/Slides.app"
+          cp LICENSE.md "$RUNNER_TEMP/Slides-mac-arm64/LICENSE.md"
+          ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/Slides-mac-arm64" artifacts/Slides-mac-arm64.zip
+      - name: Upload macOS download
+        uses: actions/upload-artifact@v4
+        with:
+          name: Slides-mac-arm64
+          path: artifacts/Slides-mac-arm64.zip
+          if-no-files-found: error
+          retention-days: 30
+      - name: Report failure
+        if: failure()
+        run: echo "macOS build failed. Check the failing step and its Xcode output in this run." >> "$GITHUB_STEP_SUMMARY"

@@ -10,7 +10,7 @@ This is Stephen Peck's personal Windows port of MxU Slides. Keep MxU's original 
 - `packages/schema/documents.json`: canonical portable document schema, shared by the macOS code generator and Windows compatibility tests. Change it through `node packages/schema/codegen.mjs`, retaining backward-compatible optional fields.
 - `apps/windows/Slides.Core`: offline show files, lyric parsing, and read-only import of the MxU Presentation JSON subset. Keep it free of WPF and platform APIs.
 - `apps/windows/Slides`: Windows WPF control window, local image/video playback, and audience window.
-- `apps/windows/Slides.Tests`: dependency-free regression runner. The `.github/workflows/windows.yml` Windows runner is the authoritative Windows compile check.
+- `apps/windows/Slides.Tests`: dependency-free regression runner. The `.github/workflows/builds.yml` Windows runner is the authoritative Windows compile check.
 
 The Windows importer currently supports text objects and solid background colors from a standalone MxU Presentation JSON file. It does not read the macOS Automerge library or render advanced objects. Preserve unknown fields at the schema level; do not claim full library compatibility until it is implemented.
 
@@ -21,7 +21,7 @@ The Windows importer currently supports text objects and solid background colors
 - Add focused regression coverage for changes to song parsing, persistence, or MxU document import. Run `dotnet run --project apps/windows/Slides.Tests/Slides.Tests.csproj --configuration Release` and `dotnet publish apps/windows/Slides/Slides.csproj -c Release -r win-x64 --self-contained true` on Windows.
 - Verify the GitHub Actions run completes successfully before stating that a downloadable Windows build works. A local Linux workspace cannot compile WPF.
 - For macOS changes, follow the build and package tests in the root `README.md`. Keep generated Xcode projects out of Git.
-- On a local Mac, use `./script/build_and_run.sh --verify` to build, install to `~/Applications`, launch, and verify the original macOS app. The `.codex/environments/environment.toml` Run action uses this script. Do not claim a Mac installation from a Linux or remote cloud workspace.
+- On a local Mac, use `./script/build_and_run.sh --verify` to build, install `Slides.app` to `~/Applications`, launch, and verify the macOS app. The `.codex/environments/environment.toml` Run action uses this script. Do not claim a Mac installation from a Linux or remote cloud workspace.
 
 ## Workflow
 

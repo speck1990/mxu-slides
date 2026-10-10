@@ -41,7 +41,9 @@ xcodebuild -project MxUSlides.xcodeproj -scheme MxUSlides -configuration Debug -
 open "$(xcodebuild -project MxUSlides.xcodeproj -scheme MxUSlides -configuration Debug -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile -showBuildSettings 2>/dev/null | awk '/TARGET_BUILD_DIR/{print $3; exit}')/MxU Slides.app"
 ```
 
-For a local Mac installation, `./script/build_and_run.sh --verify` builds the debug app, installs it into `~/Applications`, opens it, and checks that its process started. The Codex Run action uses the same script. This command requires a Mac with Xcode 26, Node 24, and XcodeGen; the script installs XcodeGen through Homebrew if needed.
+For a local Mac installation, `./script/build_and_run.sh --verify` builds the debug app as `Slides.app`, installs it into `~/Applications`, opens it, and checks that its process started. The Codex Run action uses the same script. This command requires a Mac with Xcode 26, Node 24, and XcodeGen; the script installs XcodeGen through Homebrew if needed.
+
+The [Slides builds workflow](.github/workflows/builds.yml) runs Windows and macOS jobs together. Successful runs upload `Slides-win-x64` and `Slides-mac-arm64`; the Mac artifact contains a ZIP with `Slides.app` and `LICENSE.md`. The Mac preview is built for Apple silicon and ad-hoc signed, so it is for personal testing rather than notarized distribution.
 
 Or open `MxUSlides.xcodeproj` in Xcode after `xcodegen generate` and run the `MxUSlides` scheme. Re-run `xcodegen generate` whenever you add or remove source files; the project file is generated and not checked in.
 
