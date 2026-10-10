@@ -4,6 +4,7 @@
 
 ### Added
 
+- Windows per-slide typography controls and four Mac-inspired starter palettes, basic MxU text-style import, and consistent 16:9 scaling between preview and audience projection.
 - Windows slide deck editor for creating presentations and editing slide text, solid backgrounds, media, and slide order, with Cancel leaving the show untouched.
 - Portable Windows `.slidespack` show export/import with embedded images and videos, verified media hashes, and a persistent local media cache.
 - Windows library folders with create, rename, delete, and move actions; manual relinking for moved images and videos with ambiguity protection.

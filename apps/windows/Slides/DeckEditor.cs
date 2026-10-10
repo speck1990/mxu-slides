@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -16,6 +17,12 @@ public sealed class DeckEditor : Window
     private readonly TextBox _slideName = Field();
     private readonly TextBox _body = Field();
     private readonly TextBox _background = Field();
+    private readonly TextBox _fontName = Field();
+    private readonly TextBox _fontSize = Field();
+    private readonly TextBox _textColor = Field();
+    private readonly ComboBox _alignment = new() { Width = 150, Margin = new Thickness(0, 4, 0, 12) };
+    private readonly ComboBox _weight = new() { Width = 150, Margin = new Thickness(0, 4, 0, 12) };
+    private readonly ComboBox _themes = new() { Width = 190, DisplayMemberPath = nameof(SlideTheme.Name) };
     private readonly TextBlock _media = new() { Foreground = Brushes.LightGray, TextWrapping = TextWrapping.Wrap };
     private readonly SlideSurface _preview = new() { Width = 960, Height = 540 };
     private bool _loading;
@@ -40,6 +47,12 @@ public sealed class DeckEditor : Window
         header.Children.Add(Label("Presentation title"));
         _title.Text = _draft.Name;
         header.Children.Add(_title);
+        var themeRow = new WrapPanel();
+        themeRow.Children.Add(new TextBlock { Text = "Starter look", Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 10, 0) });
+        _themes.ItemsSource = SlideThemes.All;
+        themeRow.Children.Add(_themes);
+        themeRow.Children.Add(ActionButton("Apply to all slides", ApplyTheme));
+        header.Children.Add(themeRow);
         DockPanel.SetDock(header, Dock.Top);
         layout.Children.Add(header);
 
@@ -102,6 +115,18 @@ public sealed class DeckEditor : Window
         fields.Children.Add(_body);
         fields.Children.Add(Label("Background color (#RRGGBB or #RRGGBBAA)"));
         fields.Children.Add(_background);
+        fields.Children.Add(Label("Font family"));
+        fields.Children.Add(_fontName);
+        fields.Children.Add(Label("Font size (12–160)"));
+        fields.Children.Add(_fontSize);
+        fields.Children.Add(Label("Text color (#RRGGBB or #RRGGBBAA)"));
+        fields.Children.Add(_textColor);
+        fields.Children.Add(Label("Text alignment"));
+        _alignment.ItemsSource = new[] { "left", "center", "right" };
+        fields.Children.Add(_alignment);
+        fields.Children.Add(Label("Text weight"));
+        _weight.ItemsSource = new[] { "normal", "semibold", "bold" };
+        fields.Children.Add(_weight);
         fields.Children.Add(Label("Image or video"));
         fields.Children.Add(_media);
         var mediaActions = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
@@ -117,6 +142,11 @@ public sealed class DeckEditor : Window
         _slideName.LostFocus += (_, _) => RefreshSlideList();
         _body.TextChanged += (_, _) => UpdateSlide();
         _background.TextChanged += (_, _) => UpdateSlide();
+        _fontName.TextChanged += (_, _) => UpdateTextStyle();
+        _fontSize.TextChanged += (_, _) => UpdateTextStyle();
+        _textColor.TextChanged += (_, _) => UpdateTextStyle();
+        _alignment.SelectionChanged += (_, _) => UpdateTextStyle();
+        _weight.SelectionChanged += (_, _) => UpdateTextStyle();
         _slides.SelectedIndex = 0;
     }
 
@@ -151,9 +181,17 @@ public sealed class DeckEditor : Window
         _loading = true;
         var slide = _slides.SelectedItem as Slide;
         _slideName.IsEnabled = _body.IsEnabled = _background.IsEnabled = slide is not null;
+        _fontName.IsEnabled = _fontSize.IsEnabled = _textColor.IsEnabled =
+            _alignment.IsEnabled = _weight.IsEnabled = slide is not null;
         _slideName.Text = slide?.Name ?? "";
         _body.Text = slide?.Text ?? "";
         _background.Text = slide?.Background ?? "";
+        var style = slide is null ? new SlideTextStyle() : SlideThemes.Effective(slide);
+        _fontName.Text = style.FontName;
+        _fontSize.Text = style.FontSize.ToString(CultureInfo.InvariantCulture);
+        _textColor.Text = style.ColorHex;
+        _alignment.SelectedItem = style.HorizontalAlignment;
+        _weight.SelectedItem = style.Weight;
         _media.Text = slide?.MediaPath ?? "No media";
         _preview.Show(slide, false);
         _loading = false;
@@ -166,6 +204,27 @@ public sealed class DeckEditor : Window
         slide.Text = _body.Text;
         slide.Background = _background.Text;
         _preview.Show(slide, false);
+    }
+
+    private void UpdateTextStyle()
+    {
+        if (_loading || _slides.SelectedItem is not Slide slide) return;
+        var style = slide.TextStyle ??= new SlideTextStyle();
+        style.FontName = _fontName.Text;
+        style.FontSize = double.TryParse(_fontSize.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out var size)
+            ? size : double.NaN;
+        style.ColorHex = _textColor.Text;
+        style.HorizontalAlignment = _alignment.SelectedItem as string ?? "center";
+        style.Weight = _weight.SelectedItem as string ?? "semibold";
+        if (double.IsFinite(style.FontSize) && style.FontSize is >= 12 and <= 160)
+            _preview.Show(slide, false);
+    }
+
+    private void ApplyTheme()
+    {
+        if (_themes.SelectedItem is not SlideTheme theme) return;
+        SlideThemes.Apply(_draft, theme);
+        LoadSelected();
     }
 
     private void RefreshSlideList()

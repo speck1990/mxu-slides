@@ -53,6 +53,18 @@ public sealed class Slide
     public string Text { get; set; } = "";
     public string? MediaPath { get; set; }
     public string Background { get; set; } = "#0B1220";
+    // Null keeps the appearance of shows created before typography was editable.
+    public SlideTextStyle? TextStyle { get; set; }
+}
+
+public sealed class SlideTextStyle
+{
+    public string FontName { get; set; } = "Segoe UI";
+    // Font sizes are measured on the Windows 960 x 540 design canvas.
+    public double FontSize { get; set; } = 54;
+    public string ColorHex { get; set; } = "#FFFFFFFF";
+    public string HorizontalAlignment { get; set; } = "center";
+    public string Weight { get; set; } = "semibold";
 }
 
 public static class ShowFiles

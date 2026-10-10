@@ -18,10 +18,13 @@ public static partial class PresentationEditing
 
     public static Slide AddSlide(Presentation presentation, string? mediaPath = null)
     {
+        var previous = presentation.Slides.LastOrDefault();
         var slide = new Slide
         {
             Name = mediaPath is null ? $"Slide {presentation.Slides.Count + 1}" : Path.GetFileNameWithoutExtension(mediaPath),
-            MediaPath = mediaPath
+            MediaPath = mediaPath,
+            Background = previous?.Background ?? "#0B1220",
+            TextStyle = previous?.TextStyle is { } style ? CopyStyle(style) : null
         };
         presentation.Slides.Add(slide);
         return slide;
@@ -46,6 +49,22 @@ public static partial class PresentationEditing
         presentation.Slides.Insert(to, slide);
     }
 
+    public static void PreserveSongDesign(Presentation original, Presentation replacement)
+    {
+        for (var index = 0; index < replacement.Slides.Count && original.Slides.Count > 0; index++)
+        {
+            var source = original.Slides[Math.Min(index, original.Slides.Count - 1)];
+            var slide = replacement.Slides[index];
+            slide.Background = source.Background;
+            slide.TextStyle = source.TextStyle is { } style ? CopyStyle(style) : null;
+            if (index < original.Slides.Count)
+            {
+                slide.Id = source.Id;
+                slide.MediaPath = source.MediaPath;
+            }
+        }
+    }
+
     public static void Validate(Presentation presentation)
     {
         if (string.IsNullOrWhiteSpace(presentation.Name))
@@ -56,12 +75,29 @@ public static partial class PresentationEditing
         {
             if (string.IsNullOrWhiteSpace(slide.Name))
                 throw new ArgumentException("Enter a name for every slide.");
-            if (!ColorHex().IsMatch(slide.Background))
+            if (slide.Background is null || !ColorHex().IsMatch(slide.Background))
                 throw new ArgumentException($"Use #RRGGBB or #RRGGBBAA for the background on {slide.Name}.");
+            if (slide.TextStyle is { } style)
+            {
+                if (string.IsNullOrWhiteSpace(style.FontName) || style.FontName.Length > 100)
+                    throw new ArgumentException($"Choose a font for {slide.Name}.");
+                if (!double.IsFinite(style.FontSize) || style.FontSize is < 12 or > 160)
+                    throw new ArgumentException($"Use a font size from 12 to 160 for {slide.Name}.");
+                if (style.ColorHex is null || !ColorHex().IsMatch(style.ColorHex))
+                    throw new ArgumentException($"Use #RRGGBB or #RRGGBBAA for the text color on {slide.Name}.");
+                if (style.HorizontalAlignment is not ("left" or "center" or "right"))
+                    throw new ArgumentException($"Choose Left, Center, or Right alignment for {slide.Name}.");
+                if (style.Weight is not ("normal" or "semibold" or "bold"))
+                    throw new ArgumentException($"Choose a text weight for {slide.Name}.");
+            }
             if (slide.MediaPath is { Length: > 0 } && !File.Exists(slide.MediaPath))
                 throw new FileNotFoundException($"Media is missing for {slide.Name}.", slide.MediaPath);
         }
     }
+
+    private static SlideTextStyle CopyStyle(SlideTextStyle style) =>
+        JsonSerializer.Deserialize<SlideTextStyle>(JsonSerializer.Serialize(style, ShowFiles.Json), ShowFiles.Json)
+        ?? throw new InvalidDataException("The text style could not be copied.");
 
     [GeneratedRegex("^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$")]
     private static partial Regex ColorHex();

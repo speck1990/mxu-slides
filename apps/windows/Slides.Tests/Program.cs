@@ -151,6 +151,49 @@ var cases = new (string Name, Action Run)[]
         try { PresentationEditing.Validate(deck); throw new Exception("FAIL empty deck accepted"); }
         catch (ArgumentException) { }
     }),
+    ("starter looks and typography persist without changing older shows", () =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pshow");
+        try
+        {
+            var song = SongParser.Parse("Theme song", "Verse 1\nSing together\n\nChorus\nSing again");
+            Check(song.Slides.All(slide => slide.TextStyle is null), "legacy songs use default typography");
+            var old = PresentationEditing.Copy(song);
+            var editorial = SlideThemes.All.Single(theme => theme.Id == "editorialSerif");
+            SlideThemes.Apply(song, editorial);
+            Check(song.Slides.All(slide => slide.Background == "#14120FFF" &&
+                slide.TextStyle?.FontName == "Georgia" && slide.TextStyle.ColorHex == "#F7F3EAFF"),
+                "Mac starter palette applied to every slide");
+            song.Slides[0].TextStyle!.FontSize = 62;
+            Check(song.Slides[1].TextStyle!.FontSize == 50, "each slide owns its own style");
+            var added = PresentationEditing.AddSlide(song);
+            Check(added.TextStyle?.FontName == "Georgia" && added.Background == "#14120FFF",
+                "new slide inherits the current look");
+            added.TextStyle!.ColorHex = "#123456";
+            PresentationEditing.Validate(song);
+            var edited = SongParser.Parse(song.Name, SongParser.ToEditableLyrics(song));
+            PresentationEditing.PreserveSongDesign(song, edited);
+            Check(edited.Slides[0].Id == song.Slides[0].Id &&
+                edited.Slides[0].TextStyle?.FontSize == 62, "lyric edits retain slide identity and typography");
+            Check(old.Slides[0].TextStyle is null, "unmodified song remains legacy compatible");
+            ShowFiles.Save(path, new Show { Presentations = [song] });
+            var reopened = ShowFiles.Load(path).Presentations[0];
+            Check(reopened.Slides[0].TextStyle?.FontSize == 62 &&
+                reopened.Slides[2].TextStyle?.ColorHex == "#123456", "styles survive show save");
+        }
+        finally { File.Delete(path); }
+    }),
+    ("typography rejects invalid size and color", () =>
+    {
+        var deck = PresentationEditing.NewDeck();
+        deck.Slides[0].TextStyle = new SlideTextStyle { FontSize = double.NaN };
+        try { PresentationEditing.Validate(deck); throw new Exception("FAIL NaN size accepted"); }
+        catch (ArgumentException) { }
+        deck.Slides[0].TextStyle!.FontSize = 54;
+        deck.Slides[0].TextStyle!.ColorHex = "red";
+        try { PresentationEditing.Validate(deck); throw new Exception("FAIL invalid text color accepted"); }
+        catch (ArgumentException) { }
+    }),
     ("folders organize the library without changing show snapshots", () =>
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
@@ -310,10 +353,15 @@ var cases = new (string Name, Action Run)[]
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
         try
         {
-            File.WriteAllText(path, """{"name":"Song","presentationKind":"song","slides":[{"name":"Verse","backgroundFill":{"colorHex":"#123456FF"},"objects":[{"objectKind":"text","text":"Hello"},{"objectKind":"text","text":"Hidden","hidden":true},{"objectKind":"shape","text":"Ignored"}]}]}""");
+            File.WriteAllText(path, """{"name":"Song","presentationKind":"song","slides":[{"name":"Verse","backgroundFill":{"colorHex":"#123456FF"},"objects":[{"objectKind":"text","text":"Hello","textStyle":{"fontName":"HelveticaNeue-Bold","fontSize":108,"colorHex":"#FFEEDDFF","horizontalAlignment":"left"}},{"objectKind":"text","text":"Hidden","hidden":true},{"objectKind":"shape","text":"Ignored"}]}]}""");
             var imported = MxuPresentationImport.Load(path);
             Check(imported.Slides[0].Text == "Hello", "visible lyrics");
             Check(imported.Slides[0].Background == "#123456FF", "background color");
+            var importedStyle = imported.Slides[0].TextStyle;
+            Check(importedStyle is not null && importedStyle.FontName == "Segoe UI" &&
+                importedStyle.FontSize == 54 && importedStyle.ColorHex == "#FFEEDDFF" &&
+                importedStyle.HorizontalAlignment == "left" && importedStyle.Weight == "bold",
+                "MxU text style subset maps to the Windows design canvas");
         }
         finally { File.Delete(path); }
     })
