@@ -31,6 +31,15 @@ public static class SlideThemes
                 ColorHex = theme.TextColorHex,
                 Weight = theme.Weight
             };
+            if (slide.Elements is { } elements)
+                foreach (var element in elements.Where(item => item.Kind == "text"))
+                    element.TextStyle = new SlideTextStyle
+                    {
+                        FontName = theme.FontName,
+                        FontSize = theme.FontSize,
+                        ColorHex = theme.TextColorHex,
+                        Weight = theme.Weight
+                    };
         }
     }
 

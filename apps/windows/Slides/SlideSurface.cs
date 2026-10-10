@@ -101,24 +101,66 @@ public sealed class SlideSurface : Grid
                 }
             }
         }
+        if (slide?.Elements is { Count: > 0 } elements)
+        {
+            var canvas = new Canvas { Width = SlideLayout.Width, Height = SlideLayout.Height, ClipToBounds = true };
+            foreach (var element in elements)
+            {
+                FrameworkElement visual;
+                if (element.Kind == "shape")
+                {
+                    visual = new Border
+                    {
+                        Width = element.Width, Height = element.Height,
+                        Background = Brush(element.FillColorHex),
+                        CornerRadius = new CornerRadius(Math.Max(0, element.CornerRadius))
+                    };
+                }
+                else if (element.Kind == "text")
+                {
+                    var holder = new Grid { Width = element.Width, Height = element.Height, ClipToBounds = true };
+                    var block = new TextBlock
+                    {
+                        Text = element.Text,
+                        TextWrapping = TextWrapping.Wrap,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Stretch
+                    };
+                    ApplyTextStyle(block, element.TextStyle ?? SlideThemes.Effective(slide));
+                    holder.Children.Add(block);
+                    visual = holder;
+                }
+                else continue;
+                Canvas.SetLeft(visual, element.X);
+                Canvas.SetTop(visual, element.Y);
+                canvas.Children.Add(visual);
+            }
+            Children.Add(canvas);
+            return;
+        }
         _text.Text = slide?.Text ?? "Select a slide";
         var style = slide is null ? new SlideTextStyle { FontSize = 36 } : SlideThemes.Effective(slide);
-        _text.FontFamily = new FontFamily(string.IsNullOrWhiteSpace(style.FontName) ? "Segoe UI" : style.FontName);
-        _text.FontSize = double.IsFinite(style.FontSize) && style.FontSize > 0 ? style.FontSize : 54;
-        _text.FontWeight = style.Weight switch
+        ApplyTextStyle(_text, style);
+        Children.Add(_text);
+    }
+
+    private static void ApplyTextStyle(TextBlock block, SlideTextStyle style)
+    {
+        block.FontFamily = new FontFamily(string.IsNullOrWhiteSpace(style.FontName) ? "Segoe UI" : style.FontName);
+        block.FontSize = double.IsFinite(style.FontSize) && style.FontSize > 0 ? style.FontSize : 54;
+        block.FontWeight = style.Weight switch
         {
             "normal" => FontWeights.Normal,
             "bold" => FontWeights.Bold,
             _ => FontWeights.SemiBold
         };
-        _text.Foreground = Brush(style.ColorHex);
-        _text.TextAlignment = style.HorizontalAlignment switch
+        block.Foreground = Brush(style.ColorHex);
+        block.TextAlignment = style.HorizontalAlignment switch
         {
             "left" => TextAlignment.Left,
             "right" => TextAlignment.Right,
             _ => TextAlignment.Center
         };
-        Children.Add(_text);
     }
 
     private static Brush Brush(string? color)

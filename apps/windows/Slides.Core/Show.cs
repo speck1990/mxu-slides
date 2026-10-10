@@ -55,6 +55,23 @@ public sealed class Slide
     public string Background { get; set; } = "#0B1220";
     // Null keeps the appearance of shows created before typography was editable.
     public SlideTextStyle? TextStyle { get; set; }
+    // Optional positioned objects on the Windows 960 x 540 design canvas.
+    public List<SlideElement>? Elements { get; set; }
+}
+
+public sealed class SlideElement
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Kind { get; set; } = "text";
+    public string Name { get; set; } = "Text";
+    public string Text { get; set; } = "";
+    public double X { get; set; } = 70;
+    public double Y { get; set; } = 30;
+    public double Width { get; set; } = 820;
+    public double Height { get; set; } = 480;
+    public string FillColorHex { get; set; } = "#3B82F6FF";
+    public double CornerRadius { get; set; }
+    public SlideTextStyle? TextStyle { get; set; }
 }
 
 public sealed class SlideTextStyle
