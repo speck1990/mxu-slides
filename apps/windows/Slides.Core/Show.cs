@@ -15,6 +15,7 @@ public sealed class Presentation
     public string Name { get; set; } = "Untitled";
     public string Kind { get; set; } = "song";
     public int? CcliSongNumber { get; set; }
+    public string? CcliAuthors { get; set; }
     public string? Copyright { get; set; }
     public List<Slide> Slides { get; set; } = [];
 }

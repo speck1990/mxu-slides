@@ -77,6 +77,7 @@ public partial class MainWindow : Window
             var replacement = SongParser.Parse(editor.SongTitle, editor.Lyrics);
             replacement.Id = selected.Id;
             replacement.CcliSongNumber = selected.CcliSongNumber;
+            replacement.CcliAuthors = selected.CcliAuthors;
             replacement.Copyright = selected.Copyright;
             var index = Presentations.SelectedIndex;
             _show.Presentations[index] = replacement;

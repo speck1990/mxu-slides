@@ -7,9 +7,9 @@ var cases = new (string Name, Action Run)[]
     {
         var results = SongSelect.ReadResults("""{"data":{"results":[{"id":"42","title":"Grace","songNumber":"12345","authors":[{"label":"Writer"}],"content":{"lyrics":{"exists":true,"isAuthorized":true}}}]}}""");
         Check(results.Count == 1 && results[0].CanImport && results[0].SongNumber == "12345", "search result");
-        var song = SongSelect.ReadLyrics("""{"data":{"title":"Grace","songNumber":"12345","copyrights":["© 2026 Publisher"],"lyricParts":[{"partLabel":"Verse 1","lyrics":"Line one\nLine two"},{"partLabel":"Chorus","lyrics":"Sing"}]}}""");
+        var song = SongSelect.ReadLyrics("""{"data":{"title":"Grace","songNumber":"12345","authors":["Writer"],"copyrights":["© 2026 Publisher"],"lyricParts":[{"partLabel":"Verse 1","lyrics":"Line one\nLine two"},{"partLabel":"Chorus","lyrics":"Sing"}]}}""");
         Check(song.CcliSongNumber == 12345 && song.Slides.Count == 2, "CCLI and sections");
-        Check(song.Slides[0].Text == "Line one\nLine two" && song.Copyright == "© 2026 Publisher", "lyrics and copyright");
+        Check(song.Slides[0].Text == "Line one\nLine two" && song.Copyright == "© 2026 Publisher" && song.CcliAuthors == "Writer", "lyrics and credits");
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pshow");
         try
         {

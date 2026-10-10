@@ -50,6 +50,7 @@ public static class SongSelect
         if (body.Length == 0) throw new InvalidDataException("This song has no importable lyrics.");
         var presentation = SongParser.Parse(title, body.ToString());
         if (int.TryParse(Text(data, "songNumber"), out var number)) presentation.CcliSongNumber = number;
+        presentation.CcliAuthors = Authors(data);
         if (data.TryGetProperty("copyrights", out var copyrights) && copyrights.ValueKind == JsonValueKind.Array)
             presentation.Copyright = string.Join("\n", copyrights.EnumerateArray().Select(x => x.GetString()).Where(x => !string.IsNullOrWhiteSpace(x)));
         return presentation;
