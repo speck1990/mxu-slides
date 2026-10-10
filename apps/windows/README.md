@@ -2,6 +2,8 @@
 
 Personal Windows port of MxU Slides. It keeps the original source history and license but uses a distinct application name. See the repository's `LICENSE.md` for the required MxU notice and distribution terms.
 
+The [Windows parity tracker](../../docs/windows-parity.md) records what still differs from the Mac app. This preview does not yet provide full Mac functionality or identical rendering.
+
 ## Preview features
 
 - The workspace follows the Mac app's main layout: **Service Flow** and **Libraries** on the left, slide thumbnails in the center, and **Output Preview** and projection controls on the right. The Windows library is currently stored inside each `.pshow` file.

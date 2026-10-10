@@ -14,6 +14,8 @@ This is Stephen Peck's personal Windows port of MxU Slides. Keep MxU's original 
 
 The Windows importer currently supports text objects and solid background colors from a standalone MxU Presentation JSON file. It does not read the macOS Automerge library or render advanced objects. Preserve unknown fields at the schema level; do not claim full library compatibility until it is implemented.
 
+Use `docs/windows-parity.md` as the feature inventory for the Windows port. Update it when behavior is implemented and verified on Windows; visual similarity alone does not close a parity gap.
+
 ## Conventions and tests
 
 - Use .NET 8 and built-in WPF/.NET libraries for the first milestones. Keep the Windows app offline by default; do not require an account or external service.
