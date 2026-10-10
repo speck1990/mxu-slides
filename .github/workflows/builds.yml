@@ -43,6 +43,20 @@ jobs:
         run: dotnet run --project apps/windows/Slides.Tests/Slides.Tests.csproj --configuration Release
       - name: Publish self-contained Windows app
         run: dotnet publish apps/windows/Slides/Slides.csproj --configuration Release --runtime win-x64 --self-contained true --output artifacts/Slides-win-x64 -p:PublishSingleFile=false
+      - name: Scan Windows build with Microsoft Defender
+        shell: pwsh
+        run: |
+          $status = Get-MpComputerStatus -ErrorAction Stop
+          if (-not $status.AntivirusEnabled) { throw 'Microsoft Defender Antivirus is unavailable on this runner.' }
+          $build = (Resolve-Path artifacts/Slides-win-x64).Path
+          Start-MpScan -ScanType CustomScan -ScanPath $build -ErrorAction Stop
+          $detections = @(Get-MpThreatDetection -ErrorAction Stop | Where-Object {
+            $_.Resources | Where-Object { $_ -like "*$build*" }
+          })
+          if ($detections.Count -gt 0) { throw 'Microsoft Defender reported a threat in the Windows build.' }
+          if (!(Test-Path artifacts/Slides-win-x64/Slides.exe)) { throw 'Slides.exe was removed during the malware scan.' }
+          $hash = (Get-FileHash artifacts/Slides-win-x64/Slides.exe -Algorithm SHA256).Hash
+          Add-Content $env:GITHUB_STEP_SUMMARY "Microsoft Defender scan completed without detections. Slides.exe SHA-256: ``$hash``"
       - name: Check executable and required notice
         shell: pwsh
         run: |
