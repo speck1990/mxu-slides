@@ -194,6 +194,49 @@ var cases = new (string Name, Action Run)[]
         try { PresentationEditing.Validate(deck); throw new Exception("FAIL invalid text color accepted"); }
         catch (ArgumentException) { }
     }),
+    ("positioned layout edits preserve order and save with the show", () =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pshow");
+        try
+        {
+            var slide = new Slide { Text = "Welcome" };
+            var draft = SlideLayout.BeginEdit(slide);
+            Check(draft.Count == 1 && draft[0].Text == "Welcome" && slide.Elements is null,
+                "flat slide opens as an editable text object without mutation");
+            draft[0].X = 140;
+            draft[0].Width = 420;
+            var shape = SlideLayout.AddShape(draft);
+            shape.FillColorHex = "#3B82F6FF";
+            SlideLayout.Move(draft, 1, 0);
+            var duplicate = SlideLayout.Duplicate(draft, 1);
+            duplicate.Text = "Next steps";
+            SlideLayout.Apply(slide, draft);
+            var savedElements = slide.Elements!;
+            Check(savedElements.Select(item => item.Kind).SequenceEqual(["shape", "text", "text"]),
+                "object stacking order persists");
+            Check(savedElements[1].X == 140 && savedElements[1].Width == 420 &&
+                savedElements[2].Id != savedElements[1].Id, "geometry and independent IDs");
+            Check(slide.Text == "Welcome\nNext steps", "flat text summary follows positioned text");
+            var deck = new Presentation { Kind = "deck", Slides = [slide] };
+            PresentationEditing.Validate(deck);
+            ShowFiles.Save(path, new Show { Presentations = [deck] });
+            var reopened = ShowFiles.Load(path).Presentations[0].Slides[0];
+            Check(reopened.Elements?.Count == 3 && reopened.Elements[0].FillColorHex == "#3B82F6FF",
+                "layout survives show save");
+        }
+        finally { File.Delete(path); }
+    }),
+    ("positioned layout rejects impossible bounds", () =>
+    {
+        var objects = SlideLayout.BeginEdit(new Slide { Text = "Text" });
+        objects[0].Width = double.NaN;
+        try { SlideLayout.Validate(objects); throw new Exception("FAIL NaN geometry accepted"); }
+        catch (ArgumentException) { }
+        objects[0].Width = 800;
+        objects[0].X = 2000;
+        try { SlideLayout.Validate(objects); throw new Exception("FAIL off-canvas geometry accepted"); }
+        catch (ArgumentException) { }
+    }),
     ("folders organize the library without changing show snapshots", () =>
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
@@ -268,7 +311,8 @@ var cases = new (string Name, Action Run)[]
             File.WriteAllBytes(video, [5, 6, 7]);
             var presentation = new Presentation { Name = "Media", Slides =
             [
-                new Slide { Name = "Image", MediaPath = image },
+                new Slide { Name = "Image", MediaPath = image, Elements =
+                    [new SlideElement { Name = "Title", Text = "Welcome", X = 120, Y = 80, Width = 500, Height = 160 }] },
                 new Slide { Name = "Video", MediaPath = video },
                 new Slide { Name = "Image again", MediaPath = image }
             ] };
@@ -292,6 +336,9 @@ var cases = new (string Name, Action Run)[]
                 "video works without its original path");
             Check(opened.Presentations[0].Slides[0].MediaPath == opened.Presentations[0].Slides[2].MediaPath,
                 "repeated media uses one cached copy");
+            Check(opened.Presentations[0].Slides[0].Elements?[0].Text == "Welcome" &&
+                opened.Presentations[0].Slides[0].Elements?[0].X == 120,
+                "positioned layout survives portable packaging");
             var library = new PresentationLibrary();
             library.ImportMissing(show.Presentations);
             library.Presentations[0].Name = "My edited library title";
@@ -362,6 +409,27 @@ var cases = new (string Name, Action Run)[]
                 importedStyle.FontSize == 54 && importedStyle.ColorHex == "#FFEEDDFF" &&
                 importedStyle.HorizontalAlignment == "left" && importedStyle.Weight == "bold",
                 "MxU text style subset maps to the Windows design canvas");
+        }
+        finally { File.Delete(path); }
+    }),
+    ("MxU positioned text and rectangles use the Mac canvas geometry", () =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
+        try
+        {
+            File.WriteAllText(path, """{"name":"Welcome","presentationKind":"deck","slides":[{"name":"Intro","objects":[{"objectKind":"shape","shapeKind":"roundedRectangle","name":"Blue plate","text":"","x":200,"y":100,"width":800,"height":300,"cornerRadius":20,"fill":{"fillKind":"solid","colorHex":"#3B82F6FF"}},{"objectKind":"text","name":"Title","text":"Hello","x":240,"y":140,"width":720,"height":220,"textStyle":{"fontName":"Georgia","fontSize":96,"colorHex":"#FFFFFFFF"}}]}]}""");
+            var slide = MxuPresentationImport.Load(path).Slides[0];
+            var importedElements = slide.Elements!;
+            Check(importedElements.Count == 2 && importedElements[0].Kind == "shape" &&
+                importedElements[0].X == 100 && importedElements[0].Width == 400 &&
+                importedElements[0].CornerRadius == 10, "Mac rectangle scaled to Windows canvas");
+            Check(importedElements[1].Text == "Hello" && importedElements[1].X == 120 &&
+                importedElements[1].TextStyle?.FontSize == 48, "positioned text and style imported");
+            Check(slide.Text == "Hello", "text summary remains available");
+            File.WriteAllText(path, """{"slides":[{"objects":[{"objectKind":"text","text":"No coordinates"},{"objectKind":"shape","shapeKind":"rectangle","x":0,"y":0,"width":100,"height":100,"fill":{"fillKind":"solid","colorHex":"#FFFFFFFF"}}]}]}""");
+            var fallback = MxuPresentationImport.Load(path).Slides[0];
+            Check(fallback.Elements is null && fallback.Text == "No coordinates",
+                "missing text geometry keeps the readable flat slide");
         }
         finally { File.Delete(path); }
     })

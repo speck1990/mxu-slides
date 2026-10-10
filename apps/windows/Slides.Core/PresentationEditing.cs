@@ -77,22 +77,25 @@ public static partial class PresentationEditing
                 throw new ArgumentException("Enter a name for every slide.");
             if (slide.Background is null || !ColorHex().IsMatch(slide.Background))
                 throw new ArgumentException($"Use #RRGGBB or #RRGGBBAA for the background on {slide.Name}.");
-            if (slide.TextStyle is { } style)
-            {
-                if (string.IsNullOrWhiteSpace(style.FontName) || style.FontName.Length > 100)
-                    throw new ArgumentException($"Choose a font for {slide.Name}.");
-                if (!double.IsFinite(style.FontSize) || style.FontSize is < 12 or > 160)
-                    throw new ArgumentException($"Use a font size from 12 to 160 for {slide.Name}.");
-                if (style.ColorHex is null || !ColorHex().IsMatch(style.ColorHex))
-                    throw new ArgumentException($"Use #RRGGBB or #RRGGBBAA for the text color on {slide.Name}.");
-                if (style.HorizontalAlignment is not ("left" or "center" or "right"))
-                    throw new ArgumentException($"Choose Left, Center, or Right alignment for {slide.Name}.");
-                if (style.Weight is not ("normal" or "semibold" or "bold"))
-                    throw new ArgumentException($"Choose a text weight for {slide.Name}.");
-            }
+            if (slide.TextStyle is { } style) ValidateTextStyle(style, slide.Name);
+            if (slide.Elements is { Count: > 0 } elements) SlideLayout.Validate(elements);
             if (slide.MediaPath is { Length: > 0 } && !File.Exists(slide.MediaPath))
                 throw new FileNotFoundException($"Media is missing for {slide.Name}.", slide.MediaPath);
         }
+    }
+
+    internal static void ValidateTextStyle(SlideTextStyle style, string name)
+    {
+        if (string.IsNullOrWhiteSpace(style.FontName) || style.FontName.Length > 100)
+            throw new ArgumentException($"Choose a font for {name}.");
+        if (!double.IsFinite(style.FontSize) || style.FontSize is < 12 or > 160)
+            throw new ArgumentException($"Use a font size from 12 to 160 for {name}.");
+        if (style.ColorHex is null || !ColorHex().IsMatch(style.ColorHex))
+            throw new ArgumentException($"Use #RRGGBB or #RRGGBBAA for the text color on {name}.");
+        if (style.HorizontalAlignment is not ("left" or "center" or "right"))
+            throw new ArgumentException($"Choose Left, Center, or Right alignment for {name}.");
+        if (style.Weight is not ("normal" or "semibold" or "bold"))
+            throw new ArgumentException($"Choose a text weight for {name}.");
     }
 
     private static SlideTextStyle CopyStyle(SlideTextStyle style) =>

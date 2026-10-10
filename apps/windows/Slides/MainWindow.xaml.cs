@@ -259,6 +259,11 @@ public partial class MainWindow : Window
     private void EditSong(object sender, RoutedEventArgs e)
     {
         if (SelectedPresentation is not { Kind: "song" } selected) return;
+        if (selected.Slides.Any(slide => slide.Elements is { Count: > 0 }))
+        {
+            MessageBox.Show(this, "This song has positioned slide objects. Use Edit Slides, then Edit Layout to change its text without losing the layout.", "Slides");
+            return;
+        }
         var editor = new SongEditor(selected.Name, SongParser.ToEditableLyrics(selected)) { Owner = this };
         if (editor.ShowDialog() != true) return;
         Try(() =>

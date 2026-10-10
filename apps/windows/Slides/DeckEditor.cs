@@ -108,6 +108,8 @@ public sealed class DeckEditor : Window
         fields.Children.Add(Label("Slide name"));
         fields.Children.Add(_slideName);
         fields.Children.Add(Label("Text"));
+        fields.Children.Add(new TextBlock { Text = "For positioned text and rectangles, use Edit Layout.", Foreground = Brushes.LightGray });
+        fields.Children.Add(ActionButton("Edit Layout", EditLayout));
         _body.AcceptsReturn = true;
         _body.TextWrapping = TextWrapping.Wrap;
         _body.VerticalScrollBarVisibility = ScrollBarVisibility.Auto;
@@ -180,7 +182,8 @@ public sealed class DeckEditor : Window
     {
         _loading = true;
         var slide = _slides.SelectedItem as Slide;
-        _slideName.IsEnabled = _body.IsEnabled = _background.IsEnabled = slide is not null;
+        _slideName.IsEnabled = _background.IsEnabled = slide is not null;
+        _body.IsEnabled = slide is not null && slide.Elements is not { Count: > 0 };
         _fontName.IsEnabled = _fontSize.IsEnabled = _textColor.IsEnabled =
             _alignment.IsEnabled = _weight.IsEnabled = slide is not null;
         _slideName.Text = slide?.Name ?? "";
@@ -206,6 +209,20 @@ public sealed class DeckEditor : Window
         _preview.Show(slide, false);
     }
 
+    private void EditLayout()
+    {
+        if (_slides.SelectedItem is not Slide slide) return;
+        var editor = new SlideLayoutEditor(slide) { Owner = this };
+        if (editor.ShowDialog() != true) return;
+        try
+        {
+            SlideLayout.Apply(slide, editor.EditedElements);
+            LoadSelected();
+        }
+        catch (ArgumentException error)
+        { MessageBox.Show(this, error.Message, "Slides", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
     private void UpdateTextStyle()
     {
         if (_loading || _slides.SelectedItem is not Slide slide) return;
@@ -216,6 +233,15 @@ public sealed class DeckEditor : Window
         style.ColorHex = _textColor.Text;
         style.HorizontalAlignment = _alignment.SelectedItem as string ?? "center";
         style.Weight = _weight.SelectedItem as string ?? "semibold";
+        if (slide.Elements is { } elements)
+            foreach (var element in elements)
+                if (element.Kind == "text")
+                    element.TextStyle = new SlideTextStyle
+                    {
+                        FontName = style.FontName, FontSize = style.FontSize,
+                        ColorHex = style.ColorHex, HorizontalAlignment = style.HorizontalAlignment,
+                        Weight = style.Weight
+                    };
         if (double.IsFinite(style.FontSize) && style.FontSize is >= 12 and <= 160)
             _preview.Show(slide, false);
     }
