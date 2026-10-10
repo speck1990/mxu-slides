@@ -14,7 +14,7 @@ This is Stephen Peck's personal Windows port of MxU Slides. Keep MxU's original 
 
 The Windows importer currently supports text objects and solid background colors from a standalone MxU Presentation JSON file. It does not read the macOS Automerge library or render advanced objects. Preserve unknown fields at the schema level; do not claim full library compatibility until it is implemented.
 
-SongSelect import uses CCLI partner OAuth and catalog endpoints. Never commit a client secret, subscription key, or token. Both apps use browser sign-in with the loopback redirect `http://127.0.0.1:8765/callback/`; live testing needs partner credentials and that exact URI registered with CCLI. Keep the existing offline paste and file import paths.
+SongSelect import uses a browser-assisted text export. The user signs in, searches, and downloads lyrics on SongSelect's site; Slides imports the resulting text file or pasted text. Keep passwords, session cookies, and site automation out of the app. `maximilianbiebl/ccli_downloader` was reviewed as a reference, but it has no visible software license, stores browser cookies in plain text, and is not a reusable library; do not copy or vendor it. Keep Mac and Windows import behavior and metadata tests aligned. Live download behavior requires testing with a licensed account.
 
 ## Conventions and tests
 

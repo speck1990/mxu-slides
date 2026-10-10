@@ -3,13 +3,27 @@ using Slides.Core;
 
 var cases = new (string Name, Action Run)[]
 {
-    ("SongSelect search and lyric import", () =>
+    ("SongSelect text export import", () =>
     {
-        var results = SongSelect.ReadResults("""{"data":{"results":[{"id":"42","title":"Grace","songNumber":"12345","authors":[{"label":"Writer"}],"content":{"lyrics":{"exists":true,"isAuthorized":true}}}]}}""");
-        Check(results.Count == 1 && results[0].CanImport && results[0].SongNumber == "12345", "search result");
-        var song = SongSelect.ReadLyrics("""{"data":{"title":"Grace","songNumber":"12345","authors":["Writer"],"copyrights":["© 2026 Publisher"],"lyricParts":[{"partLabel":"Verse 1","lyrics":"Line one\nLine two"},{"partLabel":"Chorus","lyrics":"Sing"}]}}""");
+        var song = SongSelectText.Parse("""
+            Grace
+
+            Verse 1
+            Line one
+            Line two
+
+            Chorus
+            Sing
+
+            CCLI Song # 12345
+            Writer
+            © 2026 Publisher
+            For use solely with the SongSelect Terms of Use. www.ccli.com
+            CCLI Licence # 67890
+            """);
         Check(song.CcliSongNumber == 12345 && song.Slides.Count == 2, "CCLI and sections");
-        Check(song.Slides[0].Text == "Line one\nLine two" && song.Copyright == "© 2026 Publisher" && song.CcliAuthors == "Writer", "lyrics and credits");
+        Check(song.Slides[0].Text == "Line one\nLine two" && song.Slides[1].Text == "Sing", "lyrics");
+        Check(song.Copyright == "© 2026 Publisher" && song.CcliAuthors == "Writer", "credits");
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pshow");
         try
         {
@@ -17,6 +31,11 @@ var cases = new (string Name, Action Run)[]
             Check(ShowFiles.Load(path).Presentations[0].CcliSongNumber == 12345, "CCLI metadata round trip");
         }
         finally { File.Delete(path); }
+    }),
+    ("SongSelect export rejects missing footer", () =>
+    {
+        try { SongSelectText.Parse("Grace\nSing"); throw new Exception("Accepted text without a CCLI number"); }
+        catch (InvalidDataException) { }
     }),
     ("song sections and blank lines", () =>
     {

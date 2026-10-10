@@ -1,3 +1,4 @@
+import AppKit
 import PPTXImport
 import PresenterCore
 import ProImport
@@ -1590,7 +1591,7 @@ private struct ImportLyricsSheet: View {
     @State private var text = ""
     @State private var title = ""
     @State private var linesPerSlide = 2
-    @State private var importingSongSelect = false
+    @State private var songSelectQuery = ""
 
     private var themeId: String { model.slideBuilding.lyricsImportThemeId ?? "" }
 
@@ -1619,7 +1620,7 @@ private struct ImportLyricsSheet: View {
                 .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.separator))
             HStack {
                 Button("Load File…", action: loadFile)
-                Button("Search SongSelect…") { importingSongSelect = true }
+                Button("Open SongSelect…", action: openSongSelect)
                 if let detected {
                     Text(formatCaption(detected))
                         .font(.callout)
@@ -1627,6 +1628,11 @@ private struct ImportLyricsSheet: View {
                 }
                 Spacer()
             }
+            TextField("SongSelect title or CCLI number (copied when opening)", text: $songSelectQuery)
+                .textFieldStyle(.roundedBorder)
+            Text("Sign in and search in your browser, download the text lyrics, then use Load File or paste them above.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             HStack(spacing: 16) {
                 TextField("Title (optional — SongSelect and ChordPro carry their own)", text: $title)
                     .textFieldStyle(.roundedBorder)
@@ -1644,9 +1650,15 @@ private struct ImportLyricsSheet: View {
         }
         .padding(16)
         .frame(width: 520)
-        .sheet(isPresented: $importingSongSelect) {
-            SongSelectImportSheet(model: model, onImported: onImported)
+    }
+
+    private func openSongSelect() {
+        let query = songSelectQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !query.isEmpty {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(query, forType: .string)
         }
+        NSWorkspace.shared.open(URL(string: "https://songselect.ccli.com")!)
     }
 
     private func formatCaption(_ format: LyricTextFormat) -> String {

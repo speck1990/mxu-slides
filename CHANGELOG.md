@@ -4,7 +4,7 @@
 
 ### Added
 
-- SongSelect partner API sign-in, title or CCLI number search, and licensed lyric import flows for Mac and Windows. Live use requires CCLI partner credentials and a registered loopback redirect URI.
+- SongSelect browser-assisted text lyric import on Mac and Windows. Users sign in and search on SongSelect, then load the downloaded text file; Slides retains sections and CCLI credits. Live download use still needs validation with a licensed account.
 - Personal Windows preview under the distinct **Slides** name, including `Slides.exe` and a matching build artifact.
 - Repeatable macOS debug build, local installation, and launch script with a Codex Run action.
 - Concurrent Windows and Apple silicon macOS GitHub Actions builds with downloadable artifacts and the required license notice.

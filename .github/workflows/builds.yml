@@ -98,8 +98,8 @@ jobs:
               exit 1
             }
           tail -n 25 "$RUNNER_TEMP/slides-mac-build.log"
-      - name: Test SongSelect payload import
-        run: swift test --package-path apps/mac/Packages/PresenterCore --filter SongSelectPayloadTests
+      - name: Test SongSelect text import
+        run: swift test --package-path apps/mac/Packages/PresenterCore --filter LyricTextImportTests
       - name: Package macOS download with license
         run: |
           app="$RUNNER_TEMP/SlidesDerivedData/Build/Products/Debug/Slides.app"

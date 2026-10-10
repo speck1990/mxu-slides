@@ -3045,14 +3045,6 @@ final class AppModel {
     }
 
     @discardableResult
-    func importSongSelect(_ lyrics: SongSelectPayload.Lyrics) throws -> String {
-        let presentation = try lyrics.makePresentation(themeId: slideBuilding.lyricsImportThemeId ?? "")
-        createInDrive(presentation)
-        lastImportSummary = "Imported \"\(presentation.name)\" (\(presentation.slides.count) slides)"
-        return presentation.id
-    }
-
-    @discardableResult
     func importProPresenter(
         urls: [URL], onDocument: ((URL) -> Void)? = nil
     ) async -> [ProPresenterImporter.DocumentSummary] {
