@@ -24,9 +24,9 @@ public sealed class FolderNameDialog : Window
         content.Children.Add(new TextBlock { Text = "Folder name" });
         content.Children.Add(_name);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var cancel = new Button { Content = "Cancel", Padding = new Thickness(12, 6), Margin = new Thickness(0, 0, 8, 0) };
+        var cancel = new Button { Content = "Cancel", Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(0, 0, 8, 0) };
         cancel.Click += (_, _) => Close();
-        var save = new Button { Content = "Save", Padding = new Thickness(12, 6) };
+        var save = new Button { Content = "Save", Padding = new Thickness(12, 6, 12, 6) };
         save.Click += (_, _) =>
         {
             if (FolderName.Length == 0)
