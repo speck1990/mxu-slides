@@ -1,17 +1,19 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using Forms = System.Windows.Forms;
 
 namespace Slides;
 
 public sealed class ProjectionWindow : Window
 {
-    private readonly SlideSurface _surface = new();
+    private readonly SlideSurface _surface = new() { Width = 960, Height = 540 };
 
     public ProjectionWindow(Forms.Screen display)
     {
         Title = "Slides Audience";
-        Content = _surface;
+        Content = new Viewbox { Child = _surface, Stretch = Stretch.Uniform };
         Background = System.Windows.Media.Brushes.Black;
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;

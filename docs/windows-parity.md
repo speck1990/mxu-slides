@@ -7,15 +7,15 @@ The goal is the same church presentation workflow and visual hierarchy on Window
 | Workspace | Service Flow, persistent local library, slide grid, output preview, projection controls | Service dates, grouping, panels, saved layouts, accessibility polish |
 | Service flow | Add a library item more than once, reorder and remove service entries | Linked plans, item timings, transitions, notes, arrangements, service tracking |
 | Library | Persistent local presentation list and search across shows; folders with create, rename, delete, and move; import from opened `.pshow`; manual media relinking by unique filename | Indexing, full media management, migration from Mac documents |
-| Slides | Song sections, text thumbnails, local images and video; create and edit flat slide decks with text, solid background, media, duplicate, remove, and reorder | Mac object editor, themes, typography, animations, overlays, advanced media layers |
-| Output | Fullscreen audience window on a selected display; blackout | Screen layouts and presets, stage displays, NDI, DeckLink, streaming |
-| Import | Standalone MxU Presentation JSON text subset; portable `.slidespack` import/export with verified embedded media | Mac library documents, PPTX, ProPresenter, direct Mac document portability |
+| Slides | Song sections, text thumbnails, local images and video; create and edit flat slide decks; per-slide font, size, color, weight, alignment, and four Mac-inspired starter palettes | Mac object editor, exact Mac typography and theme layouts, animations, overlays, advanced media layers |
+| Output | Fullscreen audience window on a selected display; blackout; preview and projection scale the same 16:9 canvas | Screen layouts and presets, stage displays, NDI, DeckLink, streaming |
+| Import | Standalone MxU Presentation JSON text, solid background, and basic first-text-object style subset; portable `.slidespack` import/export with verified embedded media | Mac library documents, object positions and effects, PPTX, ProPresenter, direct Mac document portability |
 | Operations | Autosave, portable `.pshow`, Windows CI artifact | Settings, backups, diagnostics, local API, signed installer |
 
 ## Development order
 
 1. Continue matching the Mac document and library behavior, including native Mac library import and richer media management.
-2. Port the scene and theme behavior needed for visually matching slides, with screenshot comparisons at 16:9 and common output resolutions.
+2. Continue porting scene and theme behavior needed for visually matching slides, with screenshot comparisons at 16:9 and common output resolutions. Starter palettes are only the first step.
 3. Complete service editing and controls, then add stage and production outputs.
 4. Validate each milestone on a Windows PC using the GitHub Actions download. Keep the Mac build green and document any Mac-to-Windows behavior differences until they are closed.
 

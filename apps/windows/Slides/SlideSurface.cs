@@ -102,12 +102,28 @@ public sealed class SlideSurface : Grid
             }
         }
         _text.Text = slide?.Text ?? "Select a slide";
-        _text.FontSize = slide is null ? 36 : 54;
+        var style = slide is null ? new SlideTextStyle { FontSize = 36 } : SlideThemes.Effective(slide);
+        _text.FontFamily = new FontFamily(string.IsNullOrWhiteSpace(style.FontName) ? "Segoe UI" : style.FontName);
+        _text.FontSize = double.IsFinite(style.FontSize) && style.FontSize > 0 ? style.FontSize : 54;
+        _text.FontWeight = style.Weight switch
+        {
+            "normal" => FontWeights.Normal,
+            "bold" => FontWeights.Bold,
+            _ => FontWeights.SemiBold
+        };
+        _text.Foreground = Brush(style.ColorHex);
+        _text.TextAlignment = style.HorizontalAlignment switch
+        {
+            "left" => TextAlignment.Left,
+            "right" => TextAlignment.Right,
+            _ => TextAlignment.Center
+        };
         Children.Add(_text);
     }
 
-    private static Brush Brush(string color)
+    private static Brush Brush(string? color)
     {
+        if (string.IsNullOrWhiteSpace(color)) return Brushes.Black;
         try
         {
             if (color.Length == 9 && color[0] == '#')

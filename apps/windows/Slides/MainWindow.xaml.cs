@@ -265,6 +265,7 @@ public partial class MainWindow : Window
         {
             var replacement = SongParser.Parse(editor.SongTitle, editor.Lyrics);
             replacement.Id = selected.Id;
+            PresentationEditing.PreserveSongDesign(selected, replacement);
             var index = _show.Presentations.FindIndex(presentation => presentation.Id == selected.Id);
             if (index < 0) throw new InvalidOperationException("Song is missing from the library.");
             _show.Presentations[index] = replacement;

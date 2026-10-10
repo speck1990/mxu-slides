@@ -22,6 +22,7 @@ public static class MxuPresentationImport
         foreach (var source in slides.EnumerateArray())
         {
             var lines = new List<string>();
+            SlideTextStyle? textStyle = null;
             if (source.TryGetProperty("objects", out var objects) && objects.ValueKind == JsonValueKind.Array)
             {
                 foreach (var item in objects.EnumerateArray())
@@ -30,14 +31,20 @@ public static class MxuPresentationImport
                         (item.TryGetProperty("hidden", out var hidden) && hidden.ValueKind == JsonValueKind.True))
                         continue;
                     var value = Text(item, "text");
-                    if (!string.IsNullOrWhiteSpace(value)) lines.Add(value);
+                    if (!string.IsNullOrWhiteSpace(value))
+                    {
+                        lines.Add(value);
+                        if (textStyle is null && item.TryGetProperty("textStyle", out var style))
+                            textStyle = SlideThemes.FromMxuTextStyle(style);
+                    }
                 }
             }
             presentation.Slides.Add(new Slide
             {
                 Name = Text(source, "name") ?? "Slide",
                 Text = string.Join("\n", lines),
-                Background = Color(source) ?? Color(root) ?? "#0B1220"
+                Background = Color(source) ?? Color(root) ?? "#0B1220",
+                TextStyle = textStyle
             });
         }
         if (presentation.Slides.Count == 0)
