@@ -357,10 +357,10 @@ var cases = new (string Name, Action Run)[]
             var imported = MxuPresentationImport.Load(path);
             Check(imported.Slides[0].Text == "Hello", "visible lyrics");
             Check(imported.Slides[0].Background == "#123456FF", "background color");
-            Check(imported.Slides[0].TextStyle?.FontName == "Segoe UI" &&
-                imported.Slides[0].TextStyle.FontSize == 54 &&
-                imported.Slides[0].TextStyle.ColorHex == "#FFEEDDFF" &&
-                imported.Slides[0].TextStyle.HorizontalAlignment == "left" && imported.Slides[0].TextStyle.Weight == "bold",
+            var importedStyle = imported.Slides[0].TextStyle;
+            Check(importedStyle is not null && importedStyle.FontName == "Segoe UI" &&
+                importedStyle.FontSize == 54 && importedStyle.ColorHex == "#FFEEDDFF" &&
+                importedStyle.HorizontalAlignment == "left" && importedStyle.Weight == "bold",
                 "MxU text style subset maps to the Windows design canvas");
         }
         finally { File.Delete(path); }
