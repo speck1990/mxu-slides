@@ -4,6 +4,7 @@
 
 ### Added
 
+- Windows slide deck editor for creating presentations and editing slide text, solid backgrounds, media, and slide order, with Cancel leaving the show untouched.
 - Portable Windows `.slidespack` show export/import with embedded images and videos, verified media hashes, and a persistent local media cache.
 - Windows library folders with create, rename, delete, and move actions; manual relinking for moved images and videos with ambiguity protection.
 - Persistent Windows song and slide library shared across shows, one-time import from existing `.pshow` files, and a New Show action that keeps the library.
@@ -18,5 +19,5 @@
 
 ### Known limits
 
-- MxU library database, advanced slide objects, themes, media relinking, NDI, stage display, and DeckLink are not yet implemented on Windows.
+- MxU library database, advanced slide objects, themes, NDI, stage display, and DeckLink are not yet implemented on Windows.
 - Windows build and media behavior require validation on GitHub Actions and a Windows PC.

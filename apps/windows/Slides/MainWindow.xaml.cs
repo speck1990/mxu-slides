@@ -222,6 +222,13 @@ public partial class MainWindow : Window
         Try(() => AddNewPresentation(SongParser.Parse(editor.SongTitle, editor.Lyrics)));
     }
 
+    private void AddDeck(object sender, RoutedEventArgs e)
+    {
+        var editor = new DeckEditor(PresentationEditing.NewDeck()) { Owner = this };
+        if (editor.ShowDialog() != true) return;
+        Try(() => AddNewPresentation(editor.EditedPresentation));
+    }
+
     private void AddNewPresentation(Presentation presentation)
     {
         _library.Upsert(presentation);
@@ -262,6 +269,21 @@ public partial class MainWindow : Window
             if (index < 0) throw new InvalidOperationException("Song is missing from the library.");
             _show.Presentations[index] = replacement;
             _library.Upsert(replacement);
+            Changed(Presentations.SelectedIndex);
+        });
+    }
+
+    private void EditSlides(object sender, RoutedEventArgs e)
+    {
+        if (SelectedPresentation is not { } selected) return;
+        var editor = new DeckEditor(selected) { Owner = this };
+        if (editor.ShowDialog() != true) return;
+        Try(() =>
+        {
+            var index = _show.Presentations.FindIndex(presentation => presentation.Id == selected.Id);
+            if (index < 0) throw new InvalidOperationException("Presentation is missing from the show.");
+            _show.Presentations[index] = editor.EditedPresentation;
+            _library.Upsert(editor.EditedPresentation);
             Changed(Presentations.SelectedIndex);
         });
     }
