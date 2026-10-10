@@ -12,6 +12,8 @@ This is Stephen Peck's personal Windows port of MxU Slides. Keep MxU's original 
 - `apps/windows/Slides`: Windows WPF control window following the Mac app's service, library, slide grid, and output preview layout; local image/video playback and audience window.
 - `apps/windows/Slides.Tests`: dependency-free regression runner. The `.github/workflows/builds.yml` Windows runner is the authoritative Windows compile check.
 
+`ShowPackage` exports a `.slidespack` ZIP with a format marker, `show.json`, and content-hashed media entries. Opening one validates references and hashes, then caches media under `%LOCALAPPDATA%\Slides\packages`. Preserve ordinary `.pshow` JSON compatibility. Never extract arbitrary ZIP entries or mutate the live show while packing.
+
 The Windows importer currently supports text objects and solid background colors from a standalone MxU Presentation JSON file. It does not read the macOS Automerge library or render advanced objects. Preserve unknown fields at the schema level; do not claim full library compatibility until it is implemented.
 
 Use `docs/windows-parity.md` as the feature inventory for the Windows port. Update it when behavior is implemented and verified on Windows; visual similarity alone does not close a parity gap.

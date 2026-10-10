@@ -1,3 +1,4 @@
+using System.IO.Compression;
 using System.Text.Json;
 using Slides.Core;
 
@@ -157,6 +158,96 @@ var cases = new (string Name, Action Run)[]
             Check(presentation.Slides[1].MediaPath == Path.Combine(oldRoot, "duplicate.png"),
                 "ambiguous file remains unchanged");
             Check(presentation.Slides[3].MediaPath == unique, "working file remains unchanged");
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }),
+    ("portable show opens with media after the originals are removed", () =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var image = Path.Combine(folder, "background.png");
+            var video = Path.Combine(folder, "motion.mp4");
+            var package = Path.Combine(folder, "service.slidespack");
+            File.WriteAllBytes(image, [1, 2, 3, 4]);
+            File.WriteAllBytes(video, [5, 6, 7]);
+            var presentation = new Presentation { Name = "Media", Slides =
+            [
+                new Slide { Name = "Image", MediaPath = image },
+                new Slide { Name = "Video", MediaPath = video },
+                new Slide { Name = "Image again", MediaPath = image }
+            ] };
+            var show = new Show { Presentations = [presentation], ServiceItems = [presentation.Id, presentation.Id] };
+            ShowPackage.Save(package, show);
+            Check(show.Presentations[0].Slides[0].MediaPath == image, "packing does not change the open show");
+            using (var archive = ZipFile.OpenRead(package))
+            {
+                Check(archive.Entries.Count(entry => entry.FullName.StartsWith("media/")) == 2,
+                    "reused media is packed once");
+                using var reader = new StreamReader(archive.GetEntry("show.json")!.Open());
+                Check(!reader.ReadToEnd().Contains(image, StringComparison.Ordinal), "package omits original absolute paths");
+            }
+            File.Delete(image);
+            File.Delete(video);
+            var opened = ShowPackage.Open(package, Path.Combine(folder, "cache"));
+            Check(opened.ServiceItems!.SequenceEqual([presentation.Id, presentation.Id]), "service order survives packaging");
+            Check(File.ReadAllBytes(opened.Presentations[0].Slides[0].MediaPath!).SequenceEqual(new byte[] { 1, 2, 3, 4 }),
+                "image works without its original path");
+            Check(File.ReadAllBytes(opened.Presentations[0].Slides[1].MediaPath!).SequenceEqual(new byte[] { 5, 6, 7 }),
+                "video works without its original path");
+            Check(opened.Presentations[0].Slides[0].MediaPath == opened.Presentations[0].Slides[2].MediaPath,
+                "repeated media uses one cached copy");
+            var library = new PresentationLibrary();
+            library.ImportMissing(show.Presentations);
+            library.Presentations[0].Name = "My edited library title";
+            Check(library.RepairMissingMediaFrom(opened.Presentations), "package repairs stale library media paths");
+            Check(library.Presentations[0].Slides[0].MediaPath == opened.Presentations[0].Slides[0].MediaPath &&
+                library.Presentations[0].Name == "My edited library title", "repair preserves library edits");
+            Check(ShowPackage.Open(package, Path.Combine(folder, "cache")).Presentations[0].Slides[0].MediaPath ==
+                opened.Presentations[0].Slides[0].MediaPath, "reopening uses the same verified cache");
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }),
+    ("portable shows reject missing media and unsafe archive references", () =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var package = Path.Combine(folder, "unsafe.slidespack");
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var show = new Show { Presentations = [new Presentation { Slides =
+                [new Slide { MediaPath = Path.Combine(folder, "missing.png") }] }] };
+            try { ShowPackage.Save(package, show); throw new Exception("FAIL missing media packed"); }
+            catch (FileNotFoundException) { }
+            Check(!File.Exists(package), "failed package does not replace a show");
+
+            using (var archive = ZipFile.Open(package, ZipArchiveMode.Create))
+            {
+                using (var writer = new StreamWriter(archive.CreateEntry("format.txt").Open()))
+                    writer.Write("Slides portable show 1\n");
+                using (var writer = new StreamWriter(archive.CreateEntry("show.json").Open()))
+                    writer.Write("""{"version":1,"presentations":[{"slides":[{"mediaPath":"../../escape.png"}]}]}""");
+            }
+            try { ShowPackage.Open(package, Path.Combine(folder, "cache")); throw new Exception("FAIL unsafe path accepted"); }
+            catch (InvalidDataException) { }
+            Check(!Directory.Exists(Path.Combine(folder, "cache")), "unsafe archive extracts nothing");
+
+            File.Delete(package);
+            var badMedia = "media/" + new string('0', 64) + ".png";
+            using (var archive = ZipFile.Open(package, ZipArchiveMode.Create))
+            {
+                using (var writer = new StreamWriter(archive.CreateEntry("format.txt").Open()))
+                    writer.Write("Slides portable show 1\n");
+                using (var writer = new StreamWriter(archive.CreateEntry("show.json").Open()))
+                    writer.Write("{\"version\":1,\"presentations\":[{\"slides\":[{\"mediaPath\":\"" + badMedia + "\"}]}]}");
+                using var output = archive.CreateEntry(badMedia).Open();
+                output.WriteByte(1);
+            }
+            try { ShowPackage.Open(package, Path.Combine(folder, "cache")); throw new Exception("FAIL bad media hash accepted"); }
+            catch (InvalidDataException) { }
+            Check(!Directory.EnumerateFiles(Path.Combine(folder, "cache"), "*", SearchOption.AllDirectories).Any(),
+                "corrupt media is not cached");
         }
         finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
     }),
