@@ -13,6 +13,20 @@ namespace Slides;
 
 public partial class MainWindow : Window
 {
+    private sealed class ServiceRow(string presentationId, Presentation presentation)
+    {
+        public string PresentationId { get; } = presentationId;
+        public string Name => Presentation.Name;
+        public Presentation Presentation { get; } = presentation;
+    }
+
+    private sealed class SlideCard(int number, Slide slide)
+    {
+        public int Number { get; } = number;
+        public string Name => Slide.Name;
+        public Slide Slide { get; } = slide;
+    }
+
     private readonly string _autosavePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Slides", "autosave.pshow");
@@ -20,9 +34,12 @@ public partial class MainWindow : Window
     private ProjectionWindow? _projection;
     private bool _black;
 
+    private Presentation? SelectedPresentation => (Presentations.SelectedItem as ServiceRow)?.Presentation;
+
     public MainWindow()
     {
         InitializeComponent();
+        ServiceDate.Text = "Current show · " + DateTime.Now.ToString("dddd, MMMM d");
         foreach (var screen in Forms.Screen.AllScreens)
             DisplaySelector.Items.Add($"{screen.DeviceName} ({screen.Bounds.Width} × {screen.Bounds.Height})"
                 + (screen.Primary ? " Primary" : ""));
@@ -38,36 +55,85 @@ public partial class MainWindow : Window
 
     private void RefreshPresentations(int selection = 0)
     {
-        Presentations.ItemsSource = null;
-        Presentations.ItemsSource = _show.Presentations;
-        if (_show.Presentations.Count > 0)
-            Presentations.SelectedIndex = Math.Clamp(selection, 0, _show.Presentations.Count - 1);
-        else Render();
+        _show.EnsureServiceItems();
+        var byId = _show.Presentations.GroupBy(presentation => presentation.Id)
+            .ToDictionary(group => group.Key, group => group.First());
+        var rows = _show.ServiceItems!.Select(id => byId.TryGetValue(id, out var presentation)
+            ? new ServiceRow(id, presentation) : null)
+            .Where(row => row is not null).ToArray();
+        Presentations.ItemsSource = rows;
+        RefreshLibrary();
+        if (rows.Length > 0)
+            Presentations.SelectedIndex = Math.Clamp(selection, 0, rows.Length - 1);
+        else
+        {
+            SelectionTitle.Text = "Select an item in Service Flow";
+            Slides.ItemsSource = null;
+            Render();
+        }
     }
+
+    private void RefreshLibrary()
+    {
+        if (LibraryList is null) return;
+        var selectedId = (LibraryList.SelectedItem as Presentation)?.Id;
+        var query = LibrarySearch?.Text.Trim() ?? "";
+        var visible = _show.Presentations.Where(presentation =>
+            query.Length == 0 || presentation.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase))
+            .OrderBy(presentation => presentation.Name).ToArray();
+        LibraryList.ItemsSource = visible;
+        LibraryList.SelectedItem = visible.FirstOrDefault(presentation => presentation.Id == selectedId)
+            ?? visible.FirstOrDefault();
+    }
+
+    private void OnLibrarySearchChanged(object sender, TextChangedEventArgs e) => RefreshLibrary();
 
     private void AddSong(object sender, RoutedEventArgs e)
     {
         var editor = new SongEditor { Owner = this };
         if (editor.ShowDialog() != true) return;
+        Try(() => AddNewPresentation(SongParser.Parse(editor.SongTitle, editor.Lyrics)));
+    }
+
+    private void AddNewPresentation(Presentation presentation)
+    {
+        _show.EnsureServiceItems();
+        _show.Presentations.Add(presentation);
+        _show.AddToService(presentation.Id);
+        Changed(_show.ServiceItems!.Count - 1);
+        LibraryList.SelectedItem = presentation;
+    }
+
+    private void AddLibrarySelection(object sender, RoutedEventArgs e)
+    {
+        if (LibraryList.SelectedItem is not Presentation presentation)
+        {
+            Status.Text = "Choose a library item to add to the service.";
+            return;
+        }
         Try(() =>
         {
-            _show.Presentations.Add(SongParser.Parse(editor.SongTitle, editor.Lyrics));
-            Changed(_show.Presentations.Count - 1);
+            _show.AddToService(presentation.Id);
+            Changed(_show.ServiceItems!.Count - 1);
         });
     }
 
+    private void OnLibraryDoubleClick(object sender, MouseButtonEventArgs e) =>
+        AddLibrarySelection(sender, e);
+
     private void EditSong(object sender, RoutedEventArgs e)
     {
-        if (Presentations.SelectedItem is not Presentation selected || selected.Kind != "song") return;
+        if (SelectedPresentation is not { Kind: "song" } selected) return;
         var editor = new SongEditor(selected.Name, string.Join("\n\n", selected.Slides.Select(slide => slide.Text))) { Owner = this };
         if (editor.ShowDialog() != true) return;
         Try(() =>
         {
             var replacement = SongParser.Parse(editor.SongTitle, editor.Lyrics);
             replacement.Id = selected.Id;
-            var index = Presentations.SelectedIndex;
+            var index = _show.Presentations.FindIndex(presentation => presentation.Id == selected.Id);
+            if (index < 0) throw new InvalidOperationException("Song is missing from the library.");
             _show.Presentations[index] = replacement;
-            Changed(index);
+            Changed(Presentations.SelectedIndex);
         });
     }
 
@@ -75,9 +141,21 @@ public partial class MainWindow : Window
     {
         if (Presentations.SelectedIndex < 0) return;
         var index = Presentations.SelectedIndex;
-        if (MessageBox.Show(this, "Remove this song or deck from the show?", "Slides", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
-        _show.Presentations.RemoveAt(index);
+        if (MessageBox.Show(this, "Remove this item from the service? It will stay in the library.",
+                "Slides", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
+        _show.RemoveFromService(index);
         Changed(Math.Max(0, index - 1));
+    }
+
+    private void MoveServiceUp(object sender, RoutedEventArgs e) => MoveService(-1);
+    private void MoveServiceDown(object sender, RoutedEventArgs e) => MoveService(1);
+
+    private void MoveService(int delta)
+    {
+        var from = Presentations.SelectedIndex;
+        if (from < 0 || from + delta < 0 || from + delta >= Presentations.Items.Count) return;
+        _show.MoveServiceItem(from, from + delta);
+        Changed(from + delta);
     }
 
     private void AddMedia(object sender, RoutedEventArgs e)
@@ -88,24 +166,19 @@ public partial class MainWindow : Window
             Filter = "Images and videos|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.mp4;*.wmv;*.avi;*.mov|All files|*.*"
         };
         if (picker.ShowDialog(this) != true) return;
-        _show.Presentations.Add(new Presentation
+        Try(() => AddNewPresentation(new Presentation
         {
             Name = Path.GetFileNameWithoutExtension(picker.FileName),
             Kind = "deck",
             Slides = [new Slide { Name = "Media", MediaPath = picker.FileName }]
-        });
-        Changed(_show.Presentations.Count - 1);
+        }));
     }
 
     private void ImportMxu(object sender, RoutedEventArgs e)
     {
         var picker = new OpenFileDialog { Title = "Import MxU Presentation JSON", Filter = "JSON|*.json" };
         if (picker.ShowDialog(this) != true) return;
-        Try(() =>
-        {
-            _show.Presentations.Add(MxuPresentationImport.Load(picker.FileName));
-            Changed(_show.Presentations.Count - 1);
-        });
+        Try(() => AddNewPresentation(MxuPresentationImport.Load(picker.FileName)));
     }
 
     private void OpenShow(object sender, RoutedEventArgs e)
@@ -130,8 +203,10 @@ public partial class MainWindow : Window
 
     private void OnPresentationChanged(object sender, SelectionChangedEventArgs e)
     {
-        Slides.ItemsSource = null;
-        Slides.ItemsSource = (Presentations.SelectedItem as Presentation)?.Slides;
+        var presentation = SelectedPresentation;
+        SelectionTitle.Text = presentation?.Name ?? "Select an item in Service Flow";
+        Slides.ItemsSource = presentation?.Slides.Select((slide, index) =>
+            new SlideCard(index + 1, slide)).ToArray();
         if (Slides.Items.Count > 0) Slides.SelectedIndex = 0;
         else Render();
     }
@@ -140,10 +215,10 @@ public partial class MainWindow : Window
 
     private void Render()
     {
-        var slide = Slides.SelectedItem as Slide;
+        var slide = (Slides.SelectedItem as SlideCard)?.Slide;
         Preview.Show(slide, _black);
         _projection?.ShowSlide(slide, _black);
-        Status.Text = slide is null ? "No slide selected" : $"{Slides.SelectedIndex + 1} / {Slides.Items.Count}";
+        Status.Text = slide is null ? "No slide selected" : $"Slide {Slides.SelectedIndex + 1} of {Slides.Items.Count}";
     }
 
     private void ToggleProjection(object sender, RoutedEventArgs e)
@@ -156,11 +231,11 @@ public partial class MainWindow : Window
         _projection.Closed += (_, _) =>
         {
             _projection = null;
-            ProjectButton.Content = "Start projection  (F5)";
+            ProjectButton.Content = "Start Projection  (F5)";
             Activate();
         };
         _projection.Show();
-        ProjectButton.Content = "Stop projection  (F5)";
+        ProjectButton.Content = "Stop Projection  (F5)";
         Render();
         Activate();
     }
@@ -168,6 +243,7 @@ public partial class MainWindow : Window
     private void ToggleBlack(object sender, RoutedEventArgs e)
     {
         _black = !_black;
+        BlackButton.Content = _black ? "Restore Screen  (B)" : "Black Screen  (B)";
         Render();
     }
 

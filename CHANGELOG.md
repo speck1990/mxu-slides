@@ -4,6 +4,7 @@
 
 ### Added
 
+- Windows workspace with separate show-scoped library and ordered service flow, slide thumbnails, Mac-style panel layout, and backward-compatible `.pshow` loading.
 - Personal Windows preview under the distinct **Slides** name, including `Slides.exe` and a matching build artifact.
 - Repeatable macOS debug build, local installation, and launch script with a Codex Run action.
 - Concurrent Windows and Apple silicon macOS GitHub Actions builds with downloadable artifacts and the required license notice.

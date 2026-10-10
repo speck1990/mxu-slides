@@ -20,6 +20,24 @@ var cases = new (string Name, Action Run)[]
         }
         finally { File.Delete(path); }
     }),
+    ("legacy shows become a service with a separate library", () =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pshow");
+        try
+        {
+            File.WriteAllText(path, """{"version":1,"presentations":[{"id":"a","name":"First","kind":"song","slides":[]},{"id":"b","name":"Second","kind":"song","slides":[]}]}""");
+            var show = ShowFiles.Load(path);
+            Check(show.ServiceItems!.SequenceEqual(["a", "b"]), "legacy service order");
+            show.RemoveFromService(0);
+            Check(show.Presentations.Count == 2 && show.ServiceItems!.SequenceEqual(["b"]), "removal keeps library");
+            show.AddToService("a");
+            show.AddToService("a");
+            show.MoveServiceItem(2, 0);
+            ShowFiles.Save(path, show);
+            Check(ShowFiles.Load(path).ServiceItems!.SequenceEqual(["a", "b", "a"]), "service order survives save");
+        }
+        finally { File.Delete(path); }
+    }),
     ("MxU presentation subset uses shared schema", () =>
     {
         using var schema = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "documents.json")));

@@ -8,8 +8,8 @@ This is Stephen Peck's personal Windows port of MxU Slides. Keep MxU's original 
 
 - `apps/mac`: existing SwiftUI macOS application. Its Swift packages under `apps/mac/Packages` include `PresenterCore`, scene/rendering, media, outputs, and device integrations. Preserve this tree during Windows work.
 - `packages/schema/documents.json`: canonical portable document schema, shared by the macOS code generator and Windows compatibility tests. Change it through `node packages/schema/codegen.mjs`, retaining backward-compatible optional fields.
-- `apps/windows/Slides.Core`: offline show files, lyric parsing, and read-only import of the MxU Presentation JSON subset. Keep it free of WPF and platform APIs.
-- `apps/windows/Slides`: Windows WPF control window, local image/video playback, and audience window.
+- `apps/windows/Slides.Core`: offline show files, show-scoped library and ordered service references, lyric parsing, and read-only import of the MxU Presentation JSON subset. Keep it free of WPF and platform APIs. `Show.Presentations` is the library; `Show.ServiceItems` references presentation IDs and may repeat them. A missing service list in a legacy `.pshow` means all presentations belong to the service in their saved order.
+- `apps/windows/Slides`: Windows WPF control window following the Mac app's service, library, slide grid, and output preview layout; local image/video playback and audience window.
 - `apps/windows/Slides.Tests`: dependency-free regression runner. The `.github/workflows/builds.yml` Windows runner is the authoritative Windows compile check.
 
 The Windows importer currently supports text objects and solid background colors from a standalone MxU Presentation JSON file. It does not read the macOS Automerge library or render advanced objects. Preserve unknown fields at the schema level; do not claim full library compatibility until it is implemented.
