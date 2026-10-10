@@ -92,7 +92,12 @@ jobs:
           xcodebuild -project MxUSlides.xcodeproj -scheme MxUSlides -configuration Debug \
             -destination 'generic/platform=macOS' -derivedDataPath "$RUNNER_TEMP/SlidesDerivedData" \
             -disableAutomaticPackageResolution -onlyUsePackageVersionsFromResolvedFile \
-            -jobs 4 build 2>&1 | tee "$RUNNER_TEMP/slides-mac-build.log" | tail -n 120
+            -jobs 4 build > "$RUNNER_TEMP/slides-mac-build.log" 2>&1 || {
+              grep -n 'error:' "$RUNNER_TEMP/slides-mac-build.log" | tail -n 40 || true
+              tail -n 50 "$RUNNER_TEMP/slides-mac-build.log"
+              exit 1
+            }
+          tail -n 25 "$RUNNER_TEMP/slides-mac-build.log"
       - name: Test SongSelect payload import
         run: swift test --package-path apps/mac/Packages/PresenterCore --filter SongSelectPayloadTests
       - name: Package macOS download with license
