@@ -211,10 +211,11 @@ var cases = new (string Name, Action Run)[]
             var duplicate = SlideLayout.Duplicate(draft, 1);
             duplicate.Text = "Next steps";
             SlideLayout.Apply(slide, draft);
-            Check(slide.Elements!.Select(item => item.Kind).SequenceEqual(["shape", "text", "text"]),
+            var savedElements = slide.Elements!;
+            Check(savedElements.Select(item => item.Kind).SequenceEqual(["shape", "text", "text"]),
                 "object stacking order persists");
-            Check(slide.Elements[1].X == 140 && slide.Elements[1].Width == 420 &&
-                slide.Elements[2].Id != slide.Elements[1].Id, "geometry and independent IDs");
+            Check(savedElements[1].X == 140 && savedElements[1].Width == 420 &&
+                savedElements[2].Id != savedElements[1].Id, "geometry and independent IDs");
             Check(slide.Text == "Welcome\nNext steps", "flat text summary follows positioned text");
             var deck = new Presentation { Kind = "deck", Slides = [slide] };
             PresentationEditing.Validate(deck);
@@ -418,11 +419,12 @@ var cases = new (string Name, Action Run)[]
         {
             File.WriteAllText(path, """{"name":"Welcome","presentationKind":"deck","slides":[{"name":"Intro","objects":[{"objectKind":"shape","shapeKind":"roundedRectangle","name":"Blue plate","text":"","x":200,"y":100,"width":800,"height":300,"cornerRadius":20,"fill":{"fillKind":"solid","colorHex":"#3B82F6FF"}},{"objectKind":"text","name":"Title","text":"Hello","x":240,"y":140,"width":720,"height":220,"textStyle":{"fontName":"Georgia","fontSize":96,"colorHex":"#FFFFFFFF"}}]}]}""");
             var slide = MxuPresentationImport.Load(path).Slides[0];
-            Check(slide.Elements?.Count == 2 && slide.Elements[0].Kind == "shape" &&
-                slide.Elements[0].X == 100 && slide.Elements[0].Width == 400 &&
-                slide.Elements[0].CornerRadius == 10, "Mac rectangle scaled to Windows canvas");
-            Check(slide.Elements[1].Text == "Hello" && slide.Elements[1].X == 120 &&
-                slide.Elements[1].TextStyle?.FontSize == 48, "positioned text and style imported");
+            var importedElements = slide.Elements!;
+            Check(importedElements.Count == 2 && importedElements[0].Kind == "shape" &&
+                importedElements[0].X == 100 && importedElements[0].Width == 400 &&
+                importedElements[0].CornerRadius == 10, "Mac rectangle scaled to Windows canvas");
+            Check(importedElements[1].Text == "Hello" && importedElements[1].X == 120 &&
+                importedElements[1].TextStyle?.FontSize == 48, "positioned text and style imported");
             Check(slide.Text == "Hello", "text summary remains available");
             File.WriteAllText(path, """{"slides":[{"objects":[{"objectKind":"text","text":"No coordinates"},{"objectKind":"shape","shapeKind":"rectangle","x":0,"y":0,"width":100,"height":100,"fill":{"fillKind":"solid","colorHex":"#FFFFFFFF"}}]}]}""");
             var fallback = MxuPresentationImport.Load(path).Slides[0];
