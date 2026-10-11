@@ -4,6 +4,10 @@
 
 ### Added
 
+- Windows visual PowerPoint import renders complete slides through installed Microsoft PowerPoint, preserving the deck’s appearance as offline images that can be packed into a portable show; the earlier object importer remains available as **PPTX Editable**.
+- Windows `.pptx` import for ordered slides, text, basic solid fills and geometry, and embedded images cached locally for offline use and portable show packaging.
+- PowerPoint positioned objects retain basic rotation and flips, with safe font and object-name fallbacks.
+- PowerPoint placeholders can inherit positions and solid backgrounds from their slide layout.
 - Windows library actions to edit, duplicate, and delete songs or decks without first adding them to the service.
 - Windows library category filter and multi-file media import into an ordered deck.
 - Windows operator countdown with pause, resume, reset, and stage display readout.

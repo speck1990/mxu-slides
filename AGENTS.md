@@ -24,6 +24,8 @@ This is Stephen Peck's personal Windows port of MxU Slides. Keep MxU's original 
 
 The Windows importer currently supports text objects and solid background colors from a standalone MxU Presentation JSON file. It does not read the macOS Automerge library or render advanced objects. Preserve unknown fields at the schema level; do not claim full library compatibility until it is implemented.
 
+Windows PowerPoint import has two paths. `PowerPointImport` in Core reads a portable `.pptx` subset into editable objects without Office; theme colors, master backgrounds, and effects can differ. `PowerPointVisualImport` in the WPF app automates an installed Microsoft PowerPoint on an STA worker to export complete slide images. Keep the original document read-only, leave an already running PowerPoint instance open, and cache the exports as positioned fit-mode images so 4:3 decks are not cropped on the 16:9 canvas. Both paths add a deck to the local library and service. Visual exports are offline media and must survive `.slidespack` packaging; they do not carry playable animations, audio, or video. Windows CI compiles this path but cannot exercise Office automation, so test visual fidelity with a real `.pptx` on a Windows PC with PowerPoint before claiming it works end to end.
+
 Use `docs/windows-parity.md` as the feature inventory for the Windows port. Update it when behavior is implemented and verified on Windows; visual similarity alone does not close a parity gap.
 
 ## Conventions and tests

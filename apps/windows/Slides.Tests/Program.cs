@@ -758,6 +758,109 @@ var cases = new (string Name, Action Run)[]
         }
         finally { File.Delete(path); }
     }),
+    ("PowerPoint text import follows slide relationships and geometry", () =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pptx");
+        var cache = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            using (var archive = ZipFile.Open(path, ZipArchiveMode.Create))
+            {
+                void Write(string name, string contents)
+                {
+                    using var writer = new StreamWriter(archive.CreateEntry(name).Open());
+                    writer.Write(contents);
+                }
+                Write("ppt/presentation.xml", """
+                    <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                      <p:sldIdLst><p:sldId id="1" r:id="rId2"/><p:sldId id="2" r:id="rId1"/></p:sldIdLst>
+                      <p:sldSz cx="9600000" cy="5400000"/>
+                    </p:presentation>
+                    """);
+                Write("ppt/_rels/presentation.xml.rels", """
+                    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                      <Relationship Id="rId1" Target="slides/slide1.xml"/>
+                      <Relationship Id="rId2" Target="slides/slide2.xml"/>
+                    </Relationships>
+                    """);
+                Write("ppt/slides/slide1.xml", """
+                    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                      <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="123456"/></a:solidFill></p:bgPr></p:bg>
+                        <p:spTree><p:sp><p:nvSpPr><p:cNvPr name="Blue plate"/></p:nvSpPr>
+                          <p:spPr><a:xfrm><a:off x="500000" y="250000"/><a:ext cx="5000000" cy="1500000"/></a:xfrm>
+                            <a:prstGeom prst="rect"/><a:solidFill><a:srgbClr val="3366FF"/></a:solidFill></p:spPr>
+                        </p:sp><p:sp><p:nvSpPr><p:cNvPr name="Title"/></p:nvSpPr>
+                          <p:spPr><a:xfrm rot="5400000" flipH="1"><a:off x="1000000" y="500000"/><a:ext cx="4000000" cy="1000000"/></a:xfrm></p:spPr>
+                          <p:txBody><a:p><a:r><a:rPr sz="4000" b="1"><a:solidFill><a:srgbClr val="ABCDEF"/></a:solidFill></a:rPr><a:t>Hello</a:t></a:r></a:p></p:txBody>
+                        </p:sp></p:spTree>
+                      </p:cSld>
+                    </p:sld>
+                    """);
+                Write("ppt/slides/slide2.xml", """
+                    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                      <p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr name="Body"/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+                        <p:txBody><a:p><a:r><a:t>First in show</a:t></a:r></a:p></p:txBody></p:sp>
+                        <p:pic><p:nvPicPr><p:cNvPr name="Picture"/></p:nvPicPr><p:blipFill><a:blip r:embed="img1"/></p:blipFill>
+                          <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9600000" cy="5400000"/></a:xfrm></p:spPr>
+                        </p:pic></p:spTree></p:cSld>
+                    </p:sld>
+                    """);
+                Write("ppt/slides/_rels/slide2.xml.rels", """
+                    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                      <Relationship Id="img1" Target="../media/image1.png"/>
+                      <Relationship Id="layout1" Target="../slideLayouts/slideLayout1.xml"/>
+                    </Relationships>
+                    """);
+                Write("ppt/slideLayouts/slideLayout1.xml", """
+                    <p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                      <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="FEF3C7"/></a:solidFill></p:bgPr></p:bg>
+                        <p:spTree><p:sp><p:nvSpPr><p:cNvPr name="Body"/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+                          <p:spPr><a:xfrm><a:off x="2000000" y="1000000"/><a:ext cx="5000000" cy="2000000"/></a:xfrm></p:spPr>
+                        </p:sp></p:spTree>
+                      </p:cSld>
+                    </p:sldLayout>
+                    """);
+                using var image = archive.CreateEntry("ppt/media/image1.png").Open();
+                image.Write([1, 2, 3, 4]);
+            }
+            var imported = PowerPointImport.Load(path, cache);
+            Check(imported.Presentation.Slides.Select(slide => slide.Text)
+                .SequenceEqual(["First in show", "Hello"]), "slide order follows presentation relationships");
+            Check(imported.Presentation.Slides[0].Background == "#FEF3C7FF" &&
+                imported.Presentation.Slides[0].Elements!.Single(item => item.Kind == "text").X == 200,
+                "slide layout supplies missing placeholder geometry and background");
+            var imageElement = imported.Presentation.Slides[0].Elements!.Single(item => item.Kind == "image");
+            Check(imageElement.Name == "Picture" && imageElement.Width == 960 &&
+                File.ReadAllBytes(imageElement.MediaPath!).SequenceEqual(new byte[] { 1, 2, 3, 4 }),
+                "embedded image is cached and positioned");
+            var package = Path.Combine(cache, "imported.slidespack");
+            ShowPackage.Save(package, new Show
+            {
+                Presentations = [imported.Presentation], ServiceItems = [imported.Presentation.Id]
+            });
+            var portable = ShowPackage.Open(package, Path.Combine(cache, "portable"));
+            Check(File.Exists(portable.Presentations[0].Slides[0].Elements!
+                .Single(item => item.Kind == "image").MediaPath),
+                "imported image survives a portable show");
+            var slide = imported.Presentation.Slides[1];
+            var plate = slide.Elements!.Single(item => item.Kind == "shape");
+            var title = slide.Elements!.Single(item => item.Kind == "text");
+            Check(slide.Background == "#123456FF" && plate.FillColorHex == "#3366FFFF" &&
+                plate.X == 50 && plate.Width == 500 && title.X == 100 &&
+                title.Y == 50 && title.Width == 400 && title.TextStyle?.ColorHex == "#ABCDEFFF" &&
+                title.RotationDegrees == 90 && title.FlipHorizontal,
+                "solid background and text geometry import");
+            Check(PowerPointImport.Resolve("ppt/slides/slide1.xml", "../media/image.png") == "ppt/media/image.png",
+                "relative media target stays inside package");
+            try { PowerPointImport.Resolve("ppt/slides/slide1.xml", "../../../outside"); throw new Exception("FAIL unsafe target"); }
+            catch (InvalidDataException) { }
+        }
+        finally
+        {
+            File.Delete(path);
+            if (Directory.Exists(cache)) Directory.Delete(cache, true);
+        }
+    }),
     ("MxU positioned text and shapes use the Mac canvas geometry", () =>
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
