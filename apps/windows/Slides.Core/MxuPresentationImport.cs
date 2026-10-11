@@ -87,6 +87,10 @@ public static class MxuPresentationImport
             Text = Text(item, "text") ?? "",
             ShapeKind = Text(item, "shapeKind") == "ellipse" ? "ellipse" : "rectangle",
             X = x / 2, Y = y / 2, Width = width / 2, Height = height / 2,
+            RotationDegrees = Number(item, "rotationDegrees", out var rotation) ? rotation : 0,
+            Opacity = Number(item, "opacity", out var opacity) ? Math.Clamp(opacity, 0, 1) : 1,
+            FlipHorizontal = item.TryGetProperty("flipHorizontal", out var flipH) && flipH.ValueKind == JsonValueKind.True,
+            FlipVertical = item.TryGetProperty("flipVertical", out var flipV) && flipV.ValueKind == JsonValueKind.True,
             TextStyle = item.TryGetProperty("textStyle", out var style)
                 ? SlideThemes.FromMxuTextStyle(style) : null
         };

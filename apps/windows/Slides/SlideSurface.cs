@@ -148,6 +148,14 @@ public sealed class SlideSurface : Grid
                     visual = holder;
                 }
                 else continue;
+                visual.Opacity = element.Opacity;
+                visual.RenderTransformOrigin = new Point(0.5, 0.5);
+                var transform = new TransformGroup();
+                if (element.FlipHorizontal || element.FlipVertical)
+                    transform.Children.Add(new ScaleTransform(element.FlipHorizontal ? -1 : 1, element.FlipVertical ? -1 : 1));
+                if (element.RotationDegrees != 0)
+                    transform.Children.Add(new RotateTransform(element.RotationDegrees));
+                visual.RenderTransform = transform;
                 Canvas.SetLeft(visual, element.X);
                 Canvas.SetTop(visual, element.Y);
                 canvas.Children.Add(visual);

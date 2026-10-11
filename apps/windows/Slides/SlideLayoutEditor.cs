@@ -26,6 +26,10 @@ public sealed class SlideLayoutEditor : Window
     private readonly TextBox _height = Field();
     private readonly TextBox _fill = Field();
     private readonly TextBox _corner = Field();
+    private readonly TextBox _rotation = Field();
+    private readonly TextBox _opacity = Field();
+    private readonly CheckBox _flipHorizontal = new() { Content = "Flip horizontally", Foreground = Brushes.White };
+    private readonly CheckBox _flipVertical = new() { Content = "Flip vertically", Foreground = Brushes.White };
     private readonly TextBlock _imagePath = Label("");
     private readonly ComboBox _imageMode = new();
     private readonly Button _replaceImage;
@@ -129,6 +133,13 @@ public sealed class SlideLayoutEditor : Window
         fields.Children.Add(_fill);
         fields.Children.Add(Label("Corner radius"));
         fields.Children.Add(_corner);
+        var effects = new UniformGrid { Columns = 2 };
+        AddNumber(effects, "Rotation (degrees)", _rotation);
+        AddNumber(effects, "Opacity (%)", _opacity);
+        fields.Children.Add(effects);
+        fields.Children.Add(_flipHorizontal);
+        _flipVertical.Margin = new Thickness(0, 4, 0, 12);
+        fields.Children.Add(_flipVertical);
         fields.Children.Add(Label("Image"));
         _imagePath.Margin = new Thickness(0, 4, 0, 8);
         fields.Children.Add(_imagePath);
@@ -144,8 +155,12 @@ public sealed class SlideLayoutEditor : Window
         layout.Children.Add(columns);
         Content = layout;
 
-        foreach (var field in new[] { _name, _text, _x, _y, _width, _height, _fill, _corner })
+        foreach (var field in new[] { _name, _text, _x, _y, _width, _height, _fill, _corner, _rotation, _opacity })
             field.TextChanged += (_, _) => UpdateObject();
+        _flipHorizontal.Checked += (_, _) => UpdateObject();
+        _flipHorizontal.Unchecked += (_, _) => UpdateObject();
+        _flipVertical.Checked += (_, _) => UpdateObject();
+        _flipVertical.Unchecked += (_, _) => UpdateObject();
         _imageMode.SelectionChanged += (_, _) => UpdateObject();
         _name.LostFocus += (_, _) => RefreshObjectList();
         _objects.SelectedIndex = _elements.Count > 0 ? 0 : -1;
@@ -188,8 +203,9 @@ public sealed class SlideLayoutEditor : Window
     {
         _loading = true;
         var item = _objects.SelectedItem as SlideElement;
-        foreach (var field in new[] { _name, _text, _x, _y, _width, _height, _fill, _corner })
+        foreach (var field in new[] { _name, _text, _x, _y, _width, _height, _fill, _corner, _rotation, _opacity })
             field.IsEnabled = item is not null;
+        _flipHorizontal.IsEnabled = _flipVertical.IsEnabled = item is not null;
         _text.IsEnabled = item?.Kind == "text";
         _fill.IsEnabled = _corner.IsEnabled = item?.Kind == "shape";
         _imagePath.IsEnabled = _imageMode.IsEnabled = _replaceImage.IsEnabled = item?.Kind == "image";
@@ -201,6 +217,10 @@ public sealed class SlideLayoutEditor : Window
         _height.Text = Number(item?.Height);
         _fill.Text = item?.FillColorHex ?? "";
         _corner.Text = Number(item?.CornerRadius);
+        _rotation.Text = Number(item?.RotationDegrees);
+        _opacity.Text = Number(item?.Opacity * 100);
+        _flipHorizontal.IsChecked = item?.FlipHorizontal ?? false;
+        _flipVertical.IsChecked = item?.FlipVertical ?? false;
         _imagePath.Text = item?.Kind == "image" ? Path.GetFileName(item.MediaPath) : "No image selected";
         _imagePath.ToolTip = item?.MediaPath;
         _imageMode.SelectedItem = item?.MediaScaleMode ?? "fit";
@@ -222,6 +242,10 @@ public sealed class SlideLayoutEditor : Window
         item.Y = Parse(_y.Text);
         item.Width = Parse(_width.Text);
         item.Height = Parse(_height.Text);
+        item.RotationDegrees = Parse(_rotation.Text);
+        item.Opacity = Parse(_opacity.Text) / 100;
+        item.FlipHorizontal = _flipHorizontal.IsChecked == true;
+        item.FlipVertical = _flipVertical.IsChecked == true;
         if (item.Kind == "shape")
         {
             item.FillColorHex = _fill.Text;

@@ -73,6 +73,10 @@ public sealed class SlideElement
     public string ShapeKind { get; set; } = "rectangle";
     public string? MediaPath { get; set; }
     public string MediaScaleMode { get; set; } = "fit";
+    public double RotationDegrees { get; set; }
+    public double Opacity { get; set; } = 1;
+    public bool FlipHorizontal { get; set; }
+    public bool FlipVertical { get; set; }
     public double CornerRadius { get; set; }
     public SlideTextStyle? TextStyle { get; set; }
 }

@@ -127,6 +127,10 @@ public static partial class SlideLayout
                 throw new ArgumentException($"Image is missing for {item.Name}. Use Relink Media or choose another image.");
             if (item.Kind == "image" && item.MediaScaleMode is not ("fit" or "fill" or "stretch"))
                 throw new ArgumentException($"Choose fit, fill, or stretch for {item.Name}.");
+            if (!double.IsFinite(item.RotationDegrees) || Math.Abs(item.RotationDegrees) > 3600)
+                throw new ArgumentException($"Enter a rotation from -3600 to 3600 degrees for {item.Name}.");
+            if (!double.IsFinite(item.Opacity) || item.Opacity is < 0 or > 1)
+                throw new ArgumentException($"Enter opacity from 0 to 100 percent for {item.Name}.");
             if (!double.IsFinite(item.CornerRadius) || item.CornerRadius is < 0 or > 200)
                 throw new ArgumentException($"Enter a corner radius from 0 to 200 for {item.Name}.");
             if (item.TextStyle is { } style)
