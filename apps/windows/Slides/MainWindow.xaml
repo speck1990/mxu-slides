@@ -92,6 +92,7 @@
             <Button Content="↑" ToolTip="Move earlier" Click="MoveServiceUp" />
             <Button Content="↓" ToolTip="Move later" Click="MoveServiceDown" />
             <Button Content="Remove" Click="RemovePresentation" />
+            <Button Content="Duplicate" Click="DuplicateServiceItem" ToolTip="Repeat this item with a separate live timer" />
             <Button Content="Plan Item" Click="PlanServiceItem" />
           </WrapPanel>
         </StackPanel>
@@ -114,6 +115,13 @@
       <DockPanel Grid.Row="2">
         <StackPanel DockPanel.Dock="Top" Margin="14,12,14,8">
           <TextBlock Text="Libraries" FontWeight="SemiBold" FontSize="16" />
+          <ComboBox x:Name="LibraryTypeFilter" Margin="0,8,0,0" SelectionChanged="OnLibraryTypeChanged"
+                    ToolTip="Show songs, slide decks, or media decks">
+            <ComboBoxItem Content="All Items" />
+            <ComboBoxItem Content="Songs" />
+            <ComboBoxItem Content="Slide Decks" />
+            <ComboBoxItem Content="Media Decks" />
+          </ComboBox>
           <ComboBox x:Name="FolderFilter" Margin="0,8,0,0" DisplayMemberPath="Name"
                     SelectionChanged="OnFolderFilterChanged" ToolTip="Browse all items, top level, or a folder" />
           <TextBox x:Name="LibrarySearch" Margin="0,8,0,0" ToolTip="Search the song and slide library" TextChanged="OnLibrarySearchChanged" />
@@ -128,6 +136,9 @@
           <Button Content="New Deck" Click="AddDeck" />
           <Button Content="Add Media" Click="AddMedia" />
           <Button Content="Import MxU" Click="ImportMxu" />
+          <Button Content="Edit" Click="EditLibraryItem" />
+          <Button Content="Duplicate" Click="DuplicateLibraryItem" />
+          <Button Content="Delete" Click="DeleteLibraryItem" />
           <Button Content="Move To" Click="MoveLibraryItem" />
           <Button Content="Relink Media" Click="RelinkMedia" />
         </WrapPanel>
@@ -230,6 +241,14 @@
           <TextBlock x:Name="ItemRunStatus" Margin="0,5,0,0" />
           <TextBlock x:Name="RemainingStatus" Margin="0,5,0,0" Foreground="#32C55C" />
           <TextBlock x:Name="OperatorNote" Margin="0,12,0,0" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+          <TextBlock Text="COUNTDOWN TIMER" Foreground="{StaticResource Muted}" FontSize="11" FontWeight="SemiBold" Margin="0,18,0,7" />
+          <WrapPanel>
+            <TextBox x:Name="CountdownMinutes" Text="5" Width="48" ToolTip="Minutes, from 1 to 480" />
+            <Button Content="Set" Click="SetCountdown" Margin="6,0,0,0" />
+            <Button x:Name="CountdownButton" Content="Start" Click="ToggleCountdown" />
+            <Button Content="Reset" Click="ResetCountdown" />
+          </WrapPanel>
+          <TextBlock x:Name="CountdownStatus" Margin="0,8,0,0" FontFamily="Consolas" FontSize="16" />
           <TextBlock Text="OVERLAYS" Foreground="{StaticResource Muted}" FontSize="11" FontWeight="SemiBold" Margin="0,18,0,7" />
           <ListBox x:Name="OverlaysList" Height="110" ItemContainerStyle="{StaticResource SidebarItem}"
                    DisplayMemberPath="Name" MouseDoubleClick="OnOverlayDoubleClick" />

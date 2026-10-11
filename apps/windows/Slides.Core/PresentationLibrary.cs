@@ -118,6 +118,36 @@ public sealed class PresentationLibrary
         else Presentations[index] = copy;
     }
 
+    public Presentation Duplicate(string presentationId)
+    {
+        var source = Presentations.FirstOrDefault(item => item.Id == presentationId)
+            ?? throw new ArgumentException("Choose a presentation from the library.", nameof(presentationId));
+        var duplicate = Copy(source);
+        duplicate.Id = Guid.NewGuid().ToString("N");
+        duplicate.Name = source.Name + " Copy";
+        foreach (var slide in duplicate.Slides)
+        {
+            slide.Id = Guid.NewGuid().ToString("N");
+            if (slide.Elements is null) continue;
+            foreach (var element in slide.Elements) element.Id = Guid.NewGuid().ToString("N");
+        }
+        Presentations.Add(duplicate);
+        if (FolderFor(presentationId) is { } folderId) FolderAssignments[duplicate.Id] = folderId;
+        return duplicate;
+    }
+
+    public void Delete(string presentationId, Show currentShow)
+    {
+        currentShow.EnsureServiceItems();
+        if (currentShow.ServiceItems!.Contains(presentationId))
+            throw new InvalidOperationException("Remove this item from the current service before deleting it from the library.");
+        var index = Presentations.FindIndex(item => item.Id == presentationId);
+        if (index < 0) throw new ArgumentException("Choose a presentation from the library.", nameof(presentationId));
+        Presentations.RemoveAt(index);
+        FolderAssignments.Remove(presentationId);
+        currentShow.Presentations.RemoveAll(item => item.Id == presentationId);
+    }
+
     public bool ImportMissingOverlays(IEnumerable<Overlay> overlays)
     {
         var known = Overlays.Select(overlay => overlay.Id).ToHashSet();

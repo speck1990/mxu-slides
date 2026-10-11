@@ -86,6 +86,21 @@ var cases = new (string Name, Action Run)[]
         try { show.EnsureServiceItems(); throw new Exception("FAIL mismatched service details accepted"); }
         catch (InvalidDataException) { }
     }),
+    ("duplicated service item copies plan but gets independent timing identity", () =>
+    {
+        var song = SongParser.Parse("Repeat", "[Chorus]\nSing");
+        var show = new Show { Presentations = [song], ServiceItems = [] };
+        show.AddToService(song.Id);
+        show.UpdateServiceItem(0, "Post-Service", "Repeat softly", 3);
+        var copyIndex = show.DuplicateServiceItem(0);
+        Check(copyIndex == 1 && show.ServiceItems!.SequenceEqual([song.Id, song.Id]) &&
+            show.ServiceDetails![0].Id != show.ServiceDetails[1].Id &&
+            show.ServiceDetails[1].Section == "Post-Service" &&
+            show.ServiceDetails[1].Notes == "Repeat softly" &&
+            show.ServiceDetails[1].PlannedMinutes == 3, "new occurrence has copied plan and new ID");
+        show.UpdateServiceItem(1, "Service", "Changed", 4);
+        Check(show.ServiceDetails![0].Notes == "Repeat softly", "editing duplicate does not change source");
+    }),
     ("overlays stay in the library and portable show", () =>
     {
         var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -117,6 +132,56 @@ var cases = new (string Name, Action Run)[]
             Check(nextShow.Overlays.Single().Id == overlay.Id, "overlay can be reused in a new show");
             overlay.Layout = "unsupported";
             try { library.UpsertOverlay(overlay); throw new Exception("FAIL invalid overlay accepted"); }
+            catch (InvalidDataException) { }
+        }
+        finally { Directory.Delete(folder, true); }
+    }),
+    ("library duplicate and delete preserve service snapshots", () =>
+    {
+        var song = SongParser.Parse("Original", "[Verse 1]\nLyrics");
+        song.Slides[0].Elements = [new SlideElement { Kind = "text", Text = "Lyrics" }];
+        var library = new PresentationLibrary();
+        library.Upsert(song);
+        var folder = library.CreateFolder("Songs");
+        library.MoveToFolder(song.Id, folder.Id);
+        var copy = library.Duplicate(song.Id);
+        Check(copy.Id != song.Id && copy.Slides[0].Id != song.Slides[0].Id &&
+            copy.Slides[0].Elements![0].Id != song.Slides[0].Elements![0].Id &&
+            library.FolderFor(copy.Id) == folder.Id, "duplicate gets independent IDs and stays in folder");
+        var show = new Show { ServiceItems = [] };
+        library.AddToShow(show, song.Id);
+        try { library.Delete(song.Id, show); throw new Exception("FAIL deleted live service item"); }
+        catch (InvalidOperationException) { }
+        Check(library.Presentations.Count == 2 && show.ServiceItems!.Count == 1,
+            "blocked deletion leaves the show and library unchanged");
+        show.RemoveFromService(0);
+        library.Delete(song.Id, show);
+        Check(library.Presentations.Single().Id == copy.Id && library.FolderFor(song.Id) is null &&
+            show.Presentations.Count == 0, "deletion removes stale snapshot and folder assignment");
+    }),
+    ("multiple selected media files form an ordered portable deck", () =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var first = Path.Combine(folder, "First.png");
+            var second = Path.Combine(folder, "Second.mp4");
+            File.WriteAllBytes(first, [1, 2, 3]);
+            File.WriteAllBytes(second, [4, 5, 6]);
+            var deck = MediaDeckImport.FromFiles([second, first]);
+            Check(deck.Slides.Select(slide => slide.Name).SequenceEqual(["Second", "First"]) &&
+                deck.Slides.Select(slide => slide.MediaPath).SequenceEqual([second, first]),
+                "media order and paths match the selection");
+            var show = new Show { Presentations = [deck], ServiceItems = [deck.Id] };
+            var package = Path.Combine(folder, "media.slidespack");
+            ShowPackage.Save(package, show);
+            var opened = ShowPackage.Open(package, Path.Combine(folder, "cache"));
+            Check(opened.Presentations.Single().Slides.All(slide => File.Exists(slide.MediaPath)),
+                "all imported media survives a portable show");
+            var unsupported = Path.Combine(folder, "notes.txt");
+            File.WriteAllText(unsupported, "text");
+            try { MediaDeckImport.FromFiles([unsupported]); throw new Exception("FAIL unsupported media accepted"); }
             catch (InvalidDataException) { }
         }
         finally { Directory.Delete(folder, true); }
@@ -154,6 +219,28 @@ var cases = new (string Name, Action Run)[]
             "clear all removes slide and overlay layers");
         output.Reset();
         Check(!output.SlidesCleared, "opening a show resets the output state");
+    }),
+    ("operator countdown pauses, resumes, completes, and resets", () =>
+    {
+        var clock = new ManualClock();
+        var timer = new CountdownTimer(clock);
+        timer.SetDuration(TimeSpan.FromMinutes(2));
+        timer.Start();
+        clock.Advance(TimeSpan.FromSeconds(45));
+        timer.Pause();
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Check(timer.Remaining == TimeSpan.FromSeconds(75) && !timer.IsComplete,
+            "pause preserves remaining time");
+        timer.Start();
+        clock.Advance(TimeSpan.FromSeconds(80));
+        Check(timer.IsComplete && timer.Remaining == TimeSpan.Zero, "timer completes at zero");
+        timer.Pause();
+        timer.Start();
+        Check(timer.Remaining == TimeSpan.FromMinutes(2), "starting a completed timer restarts it");
+        timer.Reset();
+        Check(!timer.IsRunning && timer.Remaining == TimeSpan.FromMinutes(2), "reset restores duration");
+        try { timer.SetDuration(TimeSpan.Zero); throw new Exception("FAIL zero duration accepted"); }
+        catch (ArgumentOutOfRangeException) { }
     }),
     ("live service timing follows occurrences and survives pause and reorder", () =>
     {

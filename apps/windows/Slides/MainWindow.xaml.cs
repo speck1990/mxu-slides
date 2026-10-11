@@ -58,6 +58,7 @@ public partial class MainWindow : Window
         "Slides", "packages");
     private Show _show = new() { ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
     private readonly ServiceRun _run = new();
+    private readonly CountdownTimer _countdown = new();
     private readonly LiveOutputState _output = new();
     private readonly DispatcherTimer _runDisplayTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _videoDisplayTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
@@ -77,6 +78,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        LibraryTypeFilter.SelectedIndex = 0;
         StageDisplaySelector.Items.Add("Windowed preview");
         foreach (var screen in Forms.Screen.AllScreens)
         {
@@ -175,7 +177,11 @@ public partial class MainWindow : Window
         var selectedId = (LibraryList.SelectedItem as Presentation)?.Id;
         var query = LibrarySearch?.Text.Trim() ?? "";
         var folderId = (FolderFilter?.SelectedItem as FolderChoice)?.Id;
+        var category = LibraryTypeFilter?.SelectedIndex ?? 0;
         var visible = _library.Presentations.Where(presentation =>
+            (category == 0 || category == 1 && presentation.Kind == "song" ||
+                category == 2 && presentation.Kind != "song" && !presentation.Slides.Any(slide => slide.MediaPath is { Length: > 0 }) ||
+                category == 3 && presentation.Kind != "song" && presentation.Slides.Any(slide => slide.MediaPath is { Length: > 0 })) &&
             (folderId is null || (folderId.Length == 0
                 ? _library.FolderFor(presentation.Id) is null
                 : _library.FolderFor(presentation.Id) == folderId)) &&
@@ -196,6 +202,8 @@ public partial class MainWindow : Window
     }
 
     private void OnLibrarySearchChanged(object sender, TextChangedEventArgs e) => RefreshLibrary();
+
+    private void OnLibraryTypeChanged(object sender, SelectionChangedEventArgs e) => RefreshLibrary();
 
     private void OnFolderFilterChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -335,6 +343,58 @@ public partial class MainWindow : Window
     private void OnLibraryDoubleClick(object sender, MouseButtonEventArgs e) =>
         AddLibrarySelection(sender, e);
 
+    private void EditLibraryItem(object sender, RoutedEventArgs e)
+    {
+        if (LibraryList.SelectedItem is not Presentation source) return;
+        Presentation edited;
+        if (source.Kind == "song" && source.Slides.All(slide => slide.Elements is not { Count: > 0 }))
+        {
+            var songEditor = new SongEditor(source.Name, SongParser.ToEditableLyrics(source)) { Owner = this };
+            if (songEditor.ShowDialog() != true) return;
+            edited = SongParser.Parse(songEditor.SongTitle, songEditor.Lyrics);
+            edited.Id = source.Id;
+            PresentationEditing.PreserveSongDesign(source, edited);
+        }
+        else
+        {
+            var deckEditor = new DeckEditor(source) { Owner = this };
+            if (deckEditor.ShowDialog() != true) return;
+            edited = deckEditor.EditedPresentation;
+        }
+        Try(() =>
+        {
+            _library.Upsert(edited);
+            var showIndex = _show.Presentations.FindIndex(item => item.Id == edited.Id);
+            if (showIndex >= 0) _show.Presentations[showIndex] = PresentationEditing.Copy(edited);
+            Changed(SelectedServiceIndex);
+            LibraryList.SelectedItem = _library.Presentations.First(item => item.Id == edited.Id);
+        });
+    }
+
+    private void DuplicateLibraryItem(object sender, RoutedEventArgs e)
+    {
+        if (LibraryList.SelectedItem is not Presentation source) return;
+        Try(() =>
+        {
+            var duplicate = _library.Duplicate(source.Id);
+            LibraryFiles.Save(_libraryPath, _library);
+            RefreshLibrary();
+            LibraryList.SelectedItem = _library.Presentations.First(item => item.Id == duplicate.Id);
+        });
+    }
+
+    private void DeleteLibraryItem(object sender, RoutedEventArgs e)
+    {
+        if (LibraryList.SelectedItem is not Presentation source) return;
+        if (MessageBox.Show(this, $"Delete {source.Name} from the library? Saved show files will not be changed.",
+                "Slides", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Try(() =>
+        {
+            _library.Delete(source.Id, _show);
+            Changed(SelectedServiceIndex);
+        });
+    }
+
     private void EditSong(object sender, RoutedEventArgs e)
     {
         if (SelectedPresentation is not { Kind: "song" } selected) return;
@@ -383,6 +443,13 @@ public partial class MainWindow : Window
         Changed(Math.Max(0, index - 1));
     }
 
+    private void DuplicateServiceItem(object sender, RoutedEventArgs e)
+    {
+        var index = SelectedServiceIndex;
+        if (index < 0) return;
+        Try(() => Changed(_show.DuplicateServiceItem(index)));
+    }
+
     private void PlanServiceItem(object sender, RoutedEventArgs e)
     {
         var index = SelectedServiceIndex;
@@ -411,16 +478,12 @@ public partial class MainWindow : Window
     {
         var picker = new OpenFileDialog
         {
-            Title = "Choose an image or video",
+            Title = "Choose images or videos for a media deck",
+            Multiselect = true,
             Filter = "Images and videos|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.mp4;*.wmv;*.avi;*.mov|All files|*.*"
         };
         if (picker.ShowDialog(this) != true) return;
-        Try(() => AddNewPresentation(new Presentation
-        {
-            Name = Path.GetFileNameWithoutExtension(picker.FileName),
-            Kind = "deck",
-            Slides = [new Slide { Name = "Media", MediaPath = picker.FileName }]
-        }));
+        Try(() => AddNewPresentation(MediaDeckImport.FromFiles(picker.FileNames)));
     }
 
     private void ImportMxu(object sender, RoutedEventArgs e)
@@ -557,7 +620,8 @@ public partial class MainWindow : Window
         if (_stage is null) return;
         var cue = StageCue.For(_show, SelectedServiceIndex, Slides.SelectedIndex);
         if (_output.SlidesCleared) cue = cue with { CurrentHeading = "Slides cleared", CurrentText = "" };
-        _stage.Update(cue, _run.ServiceElapsed, _run.CurrentItemElapsed);
+        _stage.Update(cue, _run.ServiceElapsed, _run.CurrentItemElapsed,
+            _countdown.Remaining, _countdown.IsComplete);
     }
 
     private void ToggleVideo(object sender, RoutedEventArgs e)
@@ -785,6 +849,40 @@ public partial class MainWindow : Window
         RefreshRunDisplay();
     }
 
+    private void SetCountdown(object sender, RoutedEventArgs e)
+    {
+        Try(() =>
+        {
+            if (!int.TryParse(CountdownMinutes.Text, out var minutes) || minutes is < 1 or > 480)
+                throw new ArgumentException("Enter a whole number of minutes from 1 to 480.");
+            _countdown.SetDuration(TimeSpan.FromMinutes(minutes));
+            RefreshCountdown();
+        });
+    }
+
+    private void ToggleCountdown(object sender, RoutedEventArgs e)
+    {
+        if (_countdown.IsRunning) _countdown.Pause();
+        else _countdown.Start();
+        RefreshCountdown();
+    }
+
+    private void ResetCountdown(object sender, RoutedEventArgs e)
+    {
+        _countdown.Reset();
+        RefreshCountdown();
+    }
+
+    private void RefreshCountdown()
+    {
+        if (_countdown.IsRunning && _countdown.IsComplete) _countdown.Pause();
+        CountdownButton.Content = _countdown.IsRunning ? "Pause" :
+            _countdown.Elapsed > TimeSpan.Zero && !_countdown.IsComplete ? "Resume" : "Start";
+        CountdownStatus.Text = _countdown.IsComplete ? "00:00 · Time" :
+            FormatTime(_countdown.Remaining);
+        UpdateStage();
+    }
+
     private void RefreshRunDisplay()
     {
         var row = Presentations.SelectedItem as ServiceRow;
@@ -803,7 +901,7 @@ public partial class MainWindow : Window
             : "";
         var note = row?.Details.Notes;
         OperatorNote.Text = string.IsNullOrEmpty(note) ? "" : "Operator notes: " + note;
-        UpdateStage();
+        RefreshCountdown();
     }
 
     private static string FormatTime(TimeSpan time) =>

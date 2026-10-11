@@ -16,6 +16,7 @@ public sealed class StageWindow : Window
     private readonly TextBlock _nextText = Label(30, "#E5E8ED");
     private readonly TextBlock _notes = Label(22, "#FFD88A");
     private readonly TextBlock _timing = Label(23, "#C3C9D2");
+    private readonly TextBlock _countdown = Label(23, "#53D675");
 
     public string? DisplayDeviceName { get; }
 
@@ -61,6 +62,8 @@ public sealed class StageWindow : Window
         lower.Children.Add(next);
         var side = new StackPanel { Margin = new Thickness(20, 17, 25, 16) };
         side.Children.Add(_timing);
+        _countdown.Margin = new Thickness(0, 6, 0, 0);
+        side.Children.Add(_countdown);
         _notes.Margin = new Thickness(0, 10, 0, 0);
         side.Children.Add(_notes);
         Grid.SetColumn(side, 1);
@@ -71,7 +74,8 @@ public sealed class StageWindow : Window
         KeyDown += (_, args) => { if (args.Key == Key.Escape) Close(); };
     }
 
-    public void Update(StageCue cue, TimeSpan serviceElapsed, TimeSpan itemElapsed)
+    public void Update(StageCue cue, TimeSpan serviceElapsed, TimeSpan itemElapsed,
+        TimeSpan countdownRemaining, bool countdownComplete)
     {
         _currentHeading.Text = cue.CurrentHeading;
         _currentText.Text = cue.CurrentText;
@@ -84,6 +88,10 @@ public sealed class StageWindow : Window
                 : $" · {Format(itemElapsed - TimeSpan.FromMinutes(minutes))} over"
             : "";
         _timing.Text = $"SERVICE {Format(serviceElapsed)}\nITEM {Format(itemElapsed)}{remaining}";
+        _countdown.Text = countdownComplete ? "TIMER 00:00 · TIME" :
+            $"TIMER {Format(countdownRemaining)}";
+        _countdown.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(
+            countdownComplete ? "#FF6B6B" : "#53D675"));
     }
 
     private static TextBlock Label(int size, string color) => new()
