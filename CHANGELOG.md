@@ -31,6 +31,7 @@
 ### Fixed
 
 - Opening audience projection during an active video now seeks the audience player to the preview position when its media opens.
+- Startup restores missing overlay library entries from the autosaved show.
 - Copying presentations through the Windows library now retains per-slide typography and positioned objects.
 
 ### Known limits

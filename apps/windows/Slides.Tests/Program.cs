@@ -108,6 +108,10 @@ var cases = new (string Name, Action Run)[]
             Check(ShowFiles.Load(showPath).Overlays.Single().Name == overlay.Name &&
                 ShowPackage.Open(packagePath, Path.Combine(folder, "cache")).Overlays.Single().Id == overlay.Id,
                 "overlay survives show and package round trips");
+            var recoveredLibrary = new PresentationLibrary();
+            Check(recoveredLibrary.ImportMissingOverlays(ShowFiles.Load(showPath).Overlays) &&
+                recoveredLibrary.Overlays.Single().Id == overlay.Id,
+                "autosaved show can restore missing overlay library entries");
             var nextShow = new Show { ServiceItems = [] };
             LibraryFiles.Load(libraryPath).AddOverlayToShow(nextShow, overlay.Id);
             Check(nextShow.Overlays.Single().Id == overlay.Id, "overlay can be reused in a new show");

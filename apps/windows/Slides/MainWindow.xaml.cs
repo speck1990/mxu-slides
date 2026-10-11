@@ -92,7 +92,9 @@ public partial class MainWindow : Window
         {
             _library = LibraryFiles.Load(_libraryPath);
             if (File.Exists(_autosavePath)) _show = ShowFiles.Load(_autosavePath);
-            if (_library.ImportMissing(_show.Presentations) || !File.Exists(_libraryPath))
+            var importedPresentations = _library.ImportMissing(_show.Presentations);
+            var importedOverlays = _library.ImportMissingOverlays(_show.Overlays);
+            if (importedPresentations || importedOverlays || !File.Exists(_libraryPath))
                 LibraryFiles.Save(_libraryPath, _library);
         }
         catch (Exception ex) { MessageBox.Show($"Could not restore Slides data: {ex.Message}"); }
