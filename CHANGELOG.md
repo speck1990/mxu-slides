@@ -4,6 +4,7 @@
 
 ### Added
 
+- Windows service planning with a saved service date, section headings, per-occurrence operator notes and planned minutes, and a total planned duration in Service Flow.
 - Windows slide objects now support rotation, opacity, and horizontal or vertical flipping, including these fields from standalone MxU Presentation JSON.
 - Windows positioned image objects with fit, fill, or stretch scaling on the slide canvas; portable shows and media relinking now include these images.
 - Windows Edit Layout canvas dragging and corner resizing for positioned objects, plus solid ellipses and ellipse import from standalone MxU Presentation JSON.
