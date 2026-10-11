@@ -5,6 +5,7 @@
 ### Added
 
 - Windows library actions to edit, duplicate, and delete songs or decks without first adding them to the service.
+- Windows library category filter and multi-file media import into an ordered deck.
 - Windows video transport with play/pause, seek, elapsed/duration readout, and matching controls for preview and audience projection.
 - Windows reusable text overlays with lower-third or full-screen placement, starter looks, a persistent local library, live/clear controls, and portable show snapshots.
 - Windows stage display with current and next slide text, operator notes, service and item timing, windowed preview, and an optional dedicated fullscreen monitor.

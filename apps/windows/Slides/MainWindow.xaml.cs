@@ -77,6 +77,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        LibraryTypeFilter.SelectedIndex = 0;
         StageDisplaySelector.Items.Add("Windowed preview");
         foreach (var screen in Forms.Screen.AllScreens)
         {
@@ -175,7 +176,11 @@ public partial class MainWindow : Window
         var selectedId = (LibraryList.SelectedItem as Presentation)?.Id;
         var query = LibrarySearch?.Text.Trim() ?? "";
         var folderId = (FolderFilter?.SelectedItem as FolderChoice)?.Id;
+        var category = LibraryTypeFilter?.SelectedIndex ?? 0;
         var visible = _library.Presentations.Where(presentation =>
+            (category == 0 || category == 1 && presentation.Kind == "song" ||
+                category == 2 && presentation.Kind != "song" && !presentation.Slides.Any(slide => slide.MediaPath is { Length: > 0 }) ||
+                category == 3 && presentation.Kind != "song" && presentation.Slides.Any(slide => slide.MediaPath is { Length: > 0 })) &&
             (folderId is null || (folderId.Length == 0
                 ? _library.FolderFor(presentation.Id) is null
                 : _library.FolderFor(presentation.Id) == folderId)) &&
@@ -196,6 +201,8 @@ public partial class MainWindow : Window
     }
 
     private void OnLibrarySearchChanged(object sender, TextChangedEventArgs e) => RefreshLibrary();
+
+    private void OnLibraryTypeChanged(object sender, SelectionChangedEventArgs e) => RefreshLibrary();
 
     private void OnFolderFilterChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -463,16 +470,12 @@ public partial class MainWindow : Window
     {
         var picker = new OpenFileDialog
         {
-            Title = "Choose an image or video",
+            Title = "Choose images or videos for a media deck",
+            Multiselect = true,
             Filter = "Images and videos|*.png;*.jpg;*.jpeg;*.bmp;*.gif;*.mp4;*.wmv;*.avi;*.mov|All files|*.*"
         };
         if (picker.ShowDialog(this) != true) return;
-        Try(() => AddNewPresentation(new Presentation
-        {
-            Name = Path.GetFileNameWithoutExtension(picker.FileName),
-            Kind = "deck",
-            Slides = [new Slide { Name = "Media", MediaPath = picker.FileName }]
-        }));
+        Try(() => AddNewPresentation(MediaDeckImport.FromFiles(picker.FileNames)));
     }
 
     private void ImportMxu(object sender, RoutedEventArgs e)

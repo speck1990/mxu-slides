@@ -144,6 +144,33 @@ var cases = new (string Name, Action Run)[]
         Check(library.Presentations.Single().Id == copy.Id && library.FolderFor(song.Id) is null &&
             show.Presentations.Count == 0, "deletion removes stale snapshot and folder assignment");
     }),
+    ("multiple selected media files form an ordered portable deck", () =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var first = Path.Combine(folder, "First.png");
+            var second = Path.Combine(folder, "Second.mp4");
+            File.WriteAllBytes(first, [1, 2, 3]);
+            File.WriteAllBytes(second, [4, 5, 6]);
+            var deck = MediaDeckImport.FromFiles([second, first]);
+            Check(deck.Slides.Select(slide => slide.Name).SequenceEqual(["Second", "First"]) &&
+                deck.Slides.Select(slide => slide.MediaPath).SequenceEqual([second, first]),
+                "media order and paths match the selection");
+            var show = new Show { Presentations = [deck], ServiceItems = [deck.Id] };
+            var package = Path.Combine(folder, "media.slidespack");
+            ShowPackage.Save(package, show);
+            var opened = ShowPackage.Open(package, Path.Combine(folder, "cache"));
+            Check(opened.Presentations.Single().Slides.All(slide => File.Exists(slide.MediaPath)),
+                "all imported media survives a portable show");
+            var unsupported = Path.Combine(folder, "notes.txt");
+            File.WriteAllText(unsupported, "text");
+            try { MediaDeckImport.FromFiles([unsupported]); throw new Exception("FAIL unsupported media accepted"); }
+            catch (InvalidDataException) { }
+        }
+        finally { Directory.Delete(folder, true); }
+    }),
     ("stage cue shows current, next, and notes across service items", () =>
     {
         var song = SongParser.Parse("Song", "[Verse 1]\nFirst\n\n[Chorus]\nSecond");
