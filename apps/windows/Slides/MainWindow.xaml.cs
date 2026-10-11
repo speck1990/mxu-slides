@@ -496,7 +496,34 @@ public partial class MainWindow : Window
         Try(() => AddNewPresentation(MxuPresentationImport.Load(picker.FileName)));
     }
 
-    private void ImportPowerPoint(object sender, RoutedEventArgs e)
+    private async void ImportPowerPoint(object sender, RoutedEventArgs e)
+    {
+        var picker = new OpenFileDialog
+        {
+            Title = "Import PowerPoint deck with original appearance",
+            Filter = "PowerPoint presentations|*.pptx"
+        };
+        if (picker.ShowDialog(this) != true) return;
+        VisualPowerPointButton.IsEnabled = false;
+        Status.Text = "Rendering PowerPoint slides…";
+        try
+        {
+            var presentation = await PowerPointVisualImport.LoadAsync(picker.FileName, _importCachePath);
+            AddNewPresentation(presentation);
+            Status.Text = $"Imported {presentation.Slides.Count} PowerPoint slides with their original appearance.";
+            MessageBox.Show(this,
+                "Slides were rendered as images by PowerPoint. Colors and layout are preserved, but text and objects cannot be edited individually. The deck plays offline and can be included in Pack Show.",
+                "Slides");
+        }
+        catch (Exception error)
+        {
+            MessageBox.Show(this, error.Message, "PowerPoint import", MessageBoxButton.OK, MessageBoxImage.Error);
+            Status.Text = "PowerPoint import failed.";
+        }
+        finally { VisualPowerPointButton.IsEnabled = true; }
+    }
+
+    private void ImportPowerPointEditable(object sender, RoutedEventArgs e)
     {
         var picker = new OpenFileDialog
         {
