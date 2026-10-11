@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -13,11 +14,22 @@ namespace Slides;
 
 public partial class MainWindow : Window
 {
-    private sealed class ServiceRow(string presentationId, Presentation presentation)
+    private sealed class ServiceRow(int serviceIndex, string presentationId, Presentation presentation,
+        ServiceItemDetails details, bool startsSection)
     {
+        public int ServiceIndex { get; } = serviceIndex;
         public string PresentationId { get; } = presentationId;
         public string Name => Presentation.Name;
         public Presentation Presentation { get; } = presentation;
+        public ServiceItemDetails Details { get; } = details;
+        public string SectionHeader => details.Section.ToUpperInvariant();
+        public Visibility HeaderVisibility => startsSection ? Visibility.Visible : Visibility.Collapsed;
+        public string Subtitle => string.Join(" · ", new[]
+        {
+            details.PlannedMinutes is { } minutes ? $"{minutes} min" : "",
+            details.Notes.Split('\n')[0].Trim()
+        }.Where(value => value.Length > 0));
+        public Visibility SubtitleVisibility => Subtitle.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private sealed class SlideCard(int number, Slide slide)
@@ -42,17 +54,19 @@ public partial class MainWindow : Window
     private readonly string _packageCachePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Slides", "packages");
-    private Show _show = new();
+    private Show _show = new() { ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
     private PresentationLibrary _library = new();
     private ProjectionWindow? _projection;
     private bool _black;
+    private bool _ready;
+    private bool _updatingDate;
 
     private Presentation? SelectedPresentation => (Presentations.SelectedItem as ServiceRow)?.Presentation;
+    private int SelectedServiceIndex => (Presentations.SelectedItem as ServiceRow)?.ServiceIndex ?? -1;
 
     public MainWindow()
     {
         InitializeComponent();
-        ServiceDate.Text = "Current show · " + DateTime.Now.ToString("dddd, MMMM d");
         foreach (var screen in Forms.Screen.AllScreens)
             DisplaySelector.Items.Add($"{screen.DeviceName} ({screen.Bounds.Width} × {screen.Bounds.Height})"
                 + (screen.Primary ? " Primary" : ""));
@@ -68,6 +82,7 @@ public partial class MainWindow : Window
         catch (Exception ex) { MessageBox.Show($"Could not restore Slides data: {ex.Message}"); }
         RefreshFolderChoices();
         RefreshPresentations();
+        _ready = true;
     }
 
     private void RefreshFolderChoices(string? selectedId = null)
@@ -84,19 +99,50 @@ public partial class MainWindow : Window
         _show.EnsureServiceItems();
         var byId = _show.Presentations.GroupBy(presentation => presentation.Id)
             .ToDictionary(group => group.Key, group => group.First());
-        var rows = _show.ServiceItems!.Select(id => byId.TryGetValue(id, out var presentation)
-            ? new ServiceRow(id, presentation) : null)
-            .Where(row => row is not null).ToArray();
+        var rows = new List<ServiceRow>();
+        for (var index = 0; index < _show.ServiceItems!.Count; index++)
+        {
+            var id = _show.ServiceItems[index];
+            if (!byId.TryGetValue(id, out var presentation)) continue;
+            var details = _show.ServiceDetails![index];
+            rows.Add(new ServiceRow(index, id, presentation, details,
+                rows.Count == 0 || rows[^1].Details.Section != details.Section));
+        }
         Presentations.ItemsSource = rows;
+        RefreshServicePlanHeader();
         RefreshLibrary();
-        if (rows.Length > 0)
-            Presentations.SelectedIndex = Math.Clamp(selection, 0, rows.Length - 1);
+        if (rows.Count > 0)
+        {
+            var selectedRow = rows.FindIndex(row => row.ServiceIndex == selection);
+            Presentations.SelectedIndex = selectedRow >= 0 ? selectedRow : Math.Clamp(selection, 0, rows.Count - 1);
+        }
         else
         {
             SelectionTitle.Text = "Select an item in Service Flow";
             Slides.ItemsSource = null;
             Render();
         }
+    }
+
+    private void RefreshServicePlanHeader()
+    {
+        _updatingDate = true;
+        ServiceDatePicker.SelectedDate = _show.ServiceDate?.ToDateTime(TimeOnly.MinValue);
+        _updatingDate = false;
+        var totalMinutes = _show.ServiceDetails!.Sum(item => item.PlannedMinutes ?? 0);
+        ServiceSummary.Text = $"{_show.ServiceItems!.Count} items" +
+            (totalMinutes > 0 ? $" · {totalMinutes} planned min" : "");
+    }
+
+    private void OnServiceDateChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_ready || _updatingDate) return;
+        Try(() =>
+        {
+            _show.ServiceDate = ServiceDatePicker.SelectedDate is { } date
+                ? DateOnly.FromDateTime(date) : null;
+            Changed(SelectedServiceIndex);
+        });
     }
 
     private void RefreshLibrary()
@@ -208,7 +254,7 @@ public partial class MainWindow : Window
         Try(() =>
         {
             var result = MediaRelinker.Relink(_library.Presentations.Concat(_show.Presentations), picker.SelectedPath);
-            if (result.Updated > 0) Changed(Presentations.SelectedIndex);
+            if (result.Updated > 0) Changed(SelectedServiceIndex);
             MessageBox.Show(this,
                 $"Relinked {result.Updated} media references. {result.Unresolved} not found; {result.Ambiguous} had more than one match.",
                 "Slides");
@@ -275,7 +321,7 @@ public partial class MainWindow : Window
             if (index < 0) throw new InvalidOperationException("Song is missing from the library.");
             _show.Presentations[index] = replacement;
             _library.Upsert(replacement);
-            Changed(Presentations.SelectedIndex);
+            Changed(SelectedServiceIndex);
         });
     }
 
@@ -290,18 +336,31 @@ public partial class MainWindow : Window
             if (index < 0) throw new InvalidOperationException("Presentation is missing from the show.");
             _show.Presentations[index] = editor.EditedPresentation;
             _library.Upsert(editor.EditedPresentation);
-            Changed(Presentations.SelectedIndex);
+            Changed(SelectedServiceIndex);
         });
     }
 
     private void RemovePresentation(object sender, RoutedEventArgs e)
     {
-        if (Presentations.SelectedIndex < 0) return;
-        var index = Presentations.SelectedIndex;
+        var index = SelectedServiceIndex;
+        if (index < 0) return;
         if (MessageBox.Show(this, "Remove this item from the service? It will stay in the library.",
                 "Slides", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
         _show.RemoveFromService(index);
         Changed(Math.Max(0, index - 1));
+    }
+
+    private void PlanServiceItem(object sender, RoutedEventArgs e)
+    {
+        var index = SelectedServiceIndex;
+        if (index < 0) return;
+        var dialog = new ServiceItemDialog(_show.ServiceDetails![index]) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+        Try(() =>
+        {
+            _show.UpdateServiceItem(index, dialog.Section, dialog.Notes, dialog.PlannedMinutes);
+            Changed(index);
+        });
     }
 
     private void MoveServiceUp(object sender, RoutedEventArgs e) => MoveService(-1);
@@ -309,8 +368,8 @@ public partial class MainWindow : Window
 
     private void MoveService(int delta)
     {
-        var from = Presentations.SelectedIndex;
-        if (from < 0 || from + delta < 0 || from + delta >= Presentations.Items.Count) return;
+        var from = SelectedServiceIndex;
+        if (from < 0 || from + delta < 0 || from + delta >= _show.ServiceItems!.Count) return;
         _show.MoveServiceItem(from, from + delta);
         Changed(from + delta);
     }
@@ -380,7 +439,7 @@ public partial class MainWindow : Window
         if (_show.ServiceItems is { Count: > 0 } &&
             MessageBox.Show(this, "Start a new show? Use Save As first if you want to keep this service.",
                 "Slides", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
-        Try(() => { _show = new Show { ServiceItems = [] }; Changed(0); });
+        Try(() => { _show = new Show { ServiceItems = [], ServiceDate = DateOnly.FromDateTime(DateTime.Today) }; Changed(0); });
     }
 
     private void SaveShowAs(object sender, RoutedEventArgs e)

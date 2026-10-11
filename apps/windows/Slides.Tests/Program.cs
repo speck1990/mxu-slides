@@ -50,15 +50,41 @@ var cases = new (string Name, Action Run)[]
             File.WriteAllText(path, """{"version":1,"presentations":[{"id":"a","name":"First","kind":"song","slides":[]},{"id":"b","name":"Second","kind":"song","slides":[]}]}""");
             var show = ShowFiles.Load(path);
             Check(show.ServiceItems!.SequenceEqual(["a", "b"]), "legacy service order");
+            Check(show.ServiceDetails!.Count == 2 && show.ServiceDetails.All(item => item.Section == "Service") &&
+                show.ServiceDate is null, "legacy service defaults stay readable");
             show.RemoveFromService(0);
             Check(show.Presentations.Count == 2 && show.ServiceItems!.SequenceEqual(["b"]), "removal keeps library");
             show.AddToService("a");
             show.AddToService("a");
+            show.ServiceDate = new DateOnly(2026, 10, 18);
+            show.UpdateServiceItem(2, "Pre-Service", "Play entrance video", 4);
+            var plannedId = show.ServiceDetails![2].Id;
             show.MoveServiceItem(2, 0);
+            Check(show.ServiceDetails[0].Id == plannedId && show.ServiceDetails[0].Notes == "Play entrance video" &&
+                show.ServiceDetails[0].PlannedMinutes == 4, "moving a repeated item keeps its own plan");
             ShowFiles.Save(path, show);
-            Check(ShowFiles.Load(path).ServiceItems!.SequenceEqual(["a", "b", "a"]), "service order survives save");
+            var reopened = ShowFiles.Load(path);
+            Check(reopened.ServiceItems!.SequenceEqual(["a", "b", "a"]) &&
+                reopened.ServiceDate == new DateOnly(2026, 10, 18), "service order and date survive save");
+            Check(reopened.ServiceDetails![0].Id == plannedId && reopened.ServiceDetails[0].Section == "Pre-Service" &&
+                reopened.ServiceDetails[2].Notes == "", "repeated items retain separate planning details");
         }
         finally { File.Delete(path); }
+    }),
+    ("service plan rejects invalid details without changing an older show", () =>
+    {
+        var show = new Show { Presentations = [SongParser.Parse("Song", "Lyrics")], ServiceItems = [] };
+        show.EnsureServiceItems();
+        show.AddToService(show.Presentations[0].Id);
+        try { show.UpdateServiceItem(0, "Other", "", null); throw new Exception("FAIL unknown section accepted"); }
+        catch (ArgumentException) { }
+        try { show.UpdateServiceItem(0, "Service", "", 481); throw new Exception("FAIL long duration accepted"); }
+        catch (ArgumentException) { }
+        Check(show.ServiceDetails![0].Section == "Service" && show.ServiceDetails[0].PlannedMinutes is null,
+            "invalid edits leave the plan intact");
+        show.ServiceDetails!.Clear();
+        try { show.EnsureServiceItems(); throw new Exception("FAIL mismatched service details accepted"); }
+        catch (InvalidDataException) { }
     }),
     ("library survives a new show and keeps show snapshots independent", () =>
     {
@@ -420,6 +446,9 @@ var cases = new (string Name, Action Run)[]
                 new Slide { Name = "Image again", MediaPath = image }
             ] };
             var show = new Show { Presentations = [presentation], ServiceItems = [presentation.Id, presentation.Id] };
+            show.EnsureServiceItems();
+            show.ServiceDate = new DateOnly(2026, 10, 18);
+            show.UpdateServiceItem(1, "Post-Service", "Fade to black", 2);
             ShowPackage.Save(package, show);
             Check(show.Presentations[0].Slides[0].MediaPath == image, "packing does not change the open show");
             using (var archive = ZipFile.OpenRead(package))
@@ -436,6 +465,9 @@ var cases = new (string Name, Action Run)[]
             File.Delete(inset);
             var opened = ShowPackage.Open(package, Path.Combine(folder, "cache"));
             Check(opened.ServiceItems!.SequenceEqual([presentation.Id, presentation.Id]), "service order survives packaging");
+            Check(opened.ServiceDate == new DateOnly(2026, 10, 18) &&
+                opened.ServiceDetails![1].Section == "Post-Service" && opened.ServiceDetails[1].Notes == "Fade to black",
+                "service plan survives portable packaging");
             Check(File.ReadAllBytes(opened.Presentations[0].Slides[0].MediaPath!).SequenceEqual(new byte[] { 1, 2, 3, 4 }),
                 "image works without its original path");
             Check(File.ReadAllBytes(opened.Presentations[0].Slides[1].MediaPath!).SequenceEqual(new byte[] { 5, 6, 7 }),

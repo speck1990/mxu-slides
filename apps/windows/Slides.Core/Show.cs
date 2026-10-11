@@ -9,9 +9,21 @@ public sealed class Show
     public List<Presentation> Presentations { get; set; } = [];
     // Null identifies shows saved before the library and service were separated.
     public List<string>? ServiceItems { get; set; }
+    // One planning record per service occurrence, including repeated presentations.
+    public List<ServiceItemDetails>? ServiceDetails { get; set; }
+    public DateOnly? ServiceDate { get; set; }
 
-    public void EnsureServiceItems() =>
+    public void EnsureServiceItems()
+    {
         ServiceItems ??= Presentations.Select(presentation => presentation.Id).ToList();
+        ServiceDetails ??= ServiceItems.Select(_ => new ServiceItemDetails()).ToList();
+        if (ServiceDetails.Count != ServiceItems.Count ||
+            ServiceDetails.Any(item => item is null || string.IsNullOrWhiteSpace(item.Id) ||
+                !ServiceItemDetails.Sections.Contains(item.Section) ||
+                item.Notes is null || item.Notes.Length > 2000 || item.PlannedMinutes is < 0 or > 480) ||
+            ServiceDetails.Select(item => item.Id).Distinct().Count() != ServiceDetails.Count)
+            throw new InvalidDataException("The service plan contains invalid item details.");
+    }
 
     public void AddToService(string presentationId)
     {
@@ -19,12 +31,14 @@ public sealed class Show
         if (!Presentations.Any(presentation => presentation.Id == presentationId))
             throw new ArgumentException("Choose a presentation from the library.", nameof(presentationId));
         ServiceItems!.Add(presentationId);
+        ServiceDetails!.Add(new ServiceItemDetails());
     }
 
     public void RemoveFromService(int index)
     {
         EnsureServiceItems();
         ServiceItems!.RemoveAt(index);
+        ServiceDetails!.RemoveAt(index);
     }
 
     public void MoveServiceItem(int from, int to)
@@ -33,9 +47,34 @@ public sealed class Show
         var items = ServiceItems!;
         if (from < 0 || from >= items.Count || to < 0 || to >= items.Count) return;
         var id = items[from];
+        var details = ServiceDetails!;
+        var plan = details[from];
         items.RemoveAt(from);
+        details.RemoveAt(from);
         items.Insert(to, id);
+        details.Insert(to, plan);
     }
+
+    public void UpdateServiceItem(int index, string section, string notes, int? plannedMinutes)
+    {
+        EnsureServiceItems();
+        if (!ServiceItemDetails.Sections.Contains(section) || notes is null || notes.Length > 2000 ||
+            plannedMinutes is < 0 or > 480)
+            throw new ArgumentException("Enter a valid section, notes, and duration for this service item.");
+        var item = ServiceDetails![index];
+        item.Section = section;
+        item.Notes = notes;
+        item.PlannedMinutes = plannedMinutes;
+    }
+}
+
+public sealed class ServiceItemDetails
+{
+    public static readonly string[] Sections = ["Pre-Service", "Service", "Post-Service"];
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Section { get; set; } = "Service";
+    public string Notes { get; set; } = "";
+    public int? PlannedMinutes { get; set; }
 }
 
 public sealed class Presentation
