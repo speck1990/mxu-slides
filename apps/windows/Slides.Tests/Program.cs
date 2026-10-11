@@ -786,7 +786,10 @@ var cases = new (string Name, Action Run)[]
                 Write("ppt/slides/slide1.xml", """
                     <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
                       <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="123456"/></a:solidFill></p:bgPr></p:bg>
-                        <p:spTree><p:sp><p:nvSpPr><p:cNvPr name="Title"/></p:nvSpPr>
+                        <p:spTree><p:sp><p:nvSpPr><p:cNvPr name="Blue plate"/></p:nvSpPr>
+                          <p:spPr><a:xfrm><a:off x="500000" y="250000"/><a:ext cx="5000000" cy="1500000"/></a:xfrm>
+                            <a:prstGeom prst="rect"/><a:solidFill><a:srgbClr val="3366FF"/></a:solidFill></p:spPr>
+                        </p:sp><p:sp><p:nvSpPr><p:cNvPr name="Title"/></p:nvSpPr>
                           <p:spPr><a:xfrm rot="5400000" flipH="1"><a:off x="1000000" y="500000"/><a:ext cx="4000000" cy="1000000"/></a:xfrm></p:spPr>
                           <p:txBody><a:p><a:r><a:rPr sz="4000" b="1"><a:solidFill><a:srgbClr val="ABCDEF"/></a:solidFill></a:rPr><a:t>Hello</a:t></a:r></a:p></p:txBody>
                         </p:sp></p:spTree>
@@ -826,10 +829,12 @@ var cases = new (string Name, Action Run)[]
                 .Single(item => item.Kind == "image").MediaPath),
                 "imported image survives a portable show");
             var slide = imported.Presentation.Slides[1];
-            Check(slide.Background == "#123456FF" && slide.Elements![0].X == 100 &&
-                slide.Elements[0].Y == 50 && slide.Elements[0].Width == 400 &&
-                slide.Elements[0].TextStyle?.ColorHex == "#ABCDEFFF" &&
-                slide.Elements[0].RotationDegrees == 90 && slide.Elements[0].FlipHorizontal,
+            var plate = slide.Elements!.Single(item => item.Kind == "shape");
+            var title = slide.Elements!.Single(item => item.Kind == "text");
+            Check(slide.Background == "#123456FF" && plate.FillColorHex == "#3366FFFF" &&
+                plate.X == 50 && plate.Width == 500 && title.X == 100 &&
+                title.Y == 50 && title.Width == 400 && title.TextStyle?.ColorHex == "#ABCDEFFF" &&
+                title.RotationDegrees == 90 && title.FlipHorizontal,
                 "solid background and text geometry import");
             Check(PowerPointImport.Resolve("ppt/slides/slide1.xml", "../media/image.png") == "ppt/media/image.png",
                 "relative media target stays inside package");
