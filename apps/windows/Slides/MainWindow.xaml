@@ -128,6 +128,9 @@
           <Button Content="New Deck" Click="AddDeck" />
           <Button Content="Add Media" Click="AddMedia" />
           <Button Content="Import MxU" Click="ImportMxu" />
+          <Button Content="Edit" Click="EditLibraryItem" />
+          <Button Content="Duplicate" Click="DuplicateLibraryItem" />
+          <Button Content="Delete" Click="DeleteLibraryItem" />
           <Button Content="Move To" Click="MoveLibraryItem" />
           <Button Content="Relink Media" Click="RelinkMedia" />
         </WrapPanel>

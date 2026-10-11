@@ -335,6 +335,58 @@ public partial class MainWindow : Window
     private void OnLibraryDoubleClick(object sender, MouseButtonEventArgs e) =>
         AddLibrarySelection(sender, e);
 
+    private void EditLibraryItem(object sender, RoutedEventArgs e)
+    {
+        if (LibraryList.SelectedItem is not Presentation source) return;
+        Presentation edited;
+        if (source.Kind == "song" && source.Slides.All(slide => slide.Elements is not { Count: > 0 }))
+        {
+            var songEditor = new SongEditor(source.Name, SongParser.ToEditableLyrics(source)) { Owner = this };
+            if (songEditor.ShowDialog() != true) return;
+            edited = SongParser.Parse(songEditor.SongTitle, songEditor.Lyrics);
+            edited.Id = source.Id;
+            PresentationEditing.PreserveSongDesign(source, edited);
+        }
+        else
+        {
+            var deckEditor = new DeckEditor(source) { Owner = this };
+            if (deckEditor.ShowDialog() != true) return;
+            edited = deckEditor.EditedPresentation;
+        }
+        Try(() =>
+        {
+            _library.Upsert(edited);
+            var showIndex = _show.Presentations.FindIndex(item => item.Id == edited.Id);
+            if (showIndex >= 0) _show.Presentations[showIndex] = PresentationEditing.Copy(edited);
+            Changed(SelectedServiceIndex);
+            LibraryList.SelectedItem = _library.Presentations.First(item => item.Id == edited.Id);
+        });
+    }
+
+    private void DuplicateLibraryItem(object sender, RoutedEventArgs e)
+    {
+        if (LibraryList.SelectedItem is not Presentation source) return;
+        Try(() =>
+        {
+            var duplicate = _library.Duplicate(source.Id);
+            LibraryFiles.Save(_libraryPath, _library);
+            RefreshLibrary();
+            LibraryList.SelectedItem = _library.Presentations.First(item => item.Id == duplicate.Id);
+        });
+    }
+
+    private void DeleteLibraryItem(object sender, RoutedEventArgs e)
+    {
+        if (LibraryList.SelectedItem is not Presentation source) return;
+        if (MessageBox.Show(this, $"Delete {source.Name} from the library? Saved show files will not be changed.",
+                "Slides", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Try(() =>
+        {
+            _library.Delete(source.Id, _show);
+            Changed(SelectedServiceIndex);
+        });
+    }
+
     private void EditSong(object sender, RoutedEventArgs e)
     {
         if (SelectedPresentation is not { Kind: "song" } selected) return;

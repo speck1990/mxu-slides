@@ -121,6 +121,29 @@ var cases = new (string Name, Action Run)[]
         }
         finally { Directory.Delete(folder, true); }
     }),
+    ("library duplicate and delete preserve service snapshots", () =>
+    {
+        var song = SongParser.Parse("Original", "[Verse 1]\nLyrics");
+        song.Slides[0].Elements = [new SlideElement { Kind = "text", Text = "Lyrics" }];
+        var library = new PresentationLibrary();
+        library.Upsert(song);
+        var folder = library.CreateFolder("Songs");
+        library.MoveToFolder(song.Id, folder.Id);
+        var copy = library.Duplicate(song.Id);
+        Check(copy.Id != song.Id && copy.Slides[0].Id != song.Slides[0].Id &&
+            copy.Slides[0].Elements![0].Id != song.Slides[0].Elements![0].Id &&
+            library.FolderFor(copy.Id) == folder.Id, "duplicate gets independent IDs and stays in folder");
+        var show = new Show { ServiceItems = [] };
+        library.AddToShow(show, song.Id);
+        try { library.Delete(song.Id, show); throw new Exception("FAIL deleted live service item"); }
+        catch (InvalidOperationException) { }
+        Check(library.Presentations.Count == 2 && show.ServiceItems!.Count == 1,
+            "blocked deletion leaves the show and library unchanged");
+        show.RemoveFromService(0);
+        library.Delete(song.Id, show);
+        Check(library.Presentations.Single().Id == copy.Id && library.FolderFor(song.Id) is null &&
+            show.Presentations.Count == 0, "deletion removes stale snapshot and folder assignment");
+    }),
     ("stage cue shows current, next, and notes across service items", () =>
     {
         var song = SongParser.Parse("Song", "[Verse 1]\nFirst\n\n[Chorus]\nSecond");
