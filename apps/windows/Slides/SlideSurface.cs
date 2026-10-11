@@ -33,6 +33,7 @@ public sealed class SlideSurface : Grid
 
     private MediaElement? _video;
     private bool _black;
+    private bool _clear;
     private bool _surfaceReady;
     private bool _renderedAsThumbnail;
     private Slide? _displayedSlide;
@@ -40,6 +41,7 @@ public sealed class SlideSurface : Grid
     private FrameworkElement? _overlayVisual;
     private bool _videoPlaying;
     private readonly Border _blackCover = new() { Background = Brushes.Black, Visibility = Visibility.Collapsed };
+    private readonly Border _clearCover = new() { Background = Brushes.Black, Visibility = Visibility.Collapsed };
     public event EventHandler? VideoStateChanged;
 
     public bool HasVideo => _video is not null;
@@ -85,11 +87,12 @@ public sealed class SlideSurface : Grid
 
     public SlideSurface() => Show(null, false);
 
-    private void Refresh() => Show(CurrentSlide, _black, _displayedOverlay);
+    private void Refresh() => Show(CurrentSlide, _black, _displayedOverlay, _clear);
 
-    public void Show(Slide? slide, bool black, Overlay? overlay = null)
+    public void Show(Slide? slide, bool black, Overlay? overlay = null, bool clear = false)
     {
         _black = black;
+        _clear = clear;
         if (!_surfaceReady || !ReferenceEquals(_displayedSlide, slide) || _renderedAsThumbnail != IsThumbnail)
         {
             _displayedSlide = slide;
@@ -98,6 +101,7 @@ public sealed class SlideSurface : Grid
             _surfaceReady = true;
         }
         if (!ReferenceEquals(_displayedOverlay, overlay)) UpdateOverlay(overlay);
+        _clearCover.Visibility = clear ? Visibility.Visible : Visibility.Collapsed;
         _blackCover.Visibility = black ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -137,6 +141,7 @@ public sealed class SlideSurface : Grid
         _displayedOverlay = null;
         _overlayVisual = null;
         Background = Brush(slide?.Background ?? "#0B1220");
+        Children.Add(_clearCover);
         Children.Add(_blackCover);
         if (slide?.MediaPath is { Length: > 0 } path && File.Exists(path))
         {
@@ -144,7 +149,7 @@ public sealed class SlideSurface : Grid
             if (new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif" }
                 .Contains(Path.GetExtension(path).ToLowerInvariant()))
             {
-                Children.Insert(Children.Count - 1, new Image
+                AddContent(new Image
                 {
                     Source = new BitmapImage(uri),
                     Stretch = Stretch.UniformToFill
@@ -154,7 +159,7 @@ public sealed class SlideSurface : Grid
             {
                 if (IsThumbnail)
                 {
-                    Children.Insert(Children.Count - 1, new TextBlock
+                    AddContent(new TextBlock
                     {
                         Text = "▶",
                         FontSize = 110,
@@ -175,7 +180,7 @@ public sealed class SlideSurface : Grid
                     var video = _video;
                     video.MediaEnded += (_, _) => { video.Position = TimeSpan.Zero; video.Play(); };
                     _video.MediaOpened += (_, _) => VideoStateChanged?.Invoke(this, EventArgs.Empty);
-                    Children.Insert(Children.Count - 1, _video);
+                    AddContent(_video);
                     _video.Play();
                     _videoPlaying = true;
                 }
@@ -240,16 +245,18 @@ public sealed class SlideSurface : Grid
                 Canvas.SetTop(visual, element.Y);
                 canvas.Children.Add(visual);
             }
-            Children.Insert(Children.Count - 1, canvas);
+            AddContent(canvas);
             VideoStateChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
         _text.Text = slide?.Text ?? "Select a slide";
         var style = slide is null ? new SlideTextStyle { FontSize = 36 } : SlideThemes.Effective(slide);
         ApplyTextStyle(_text, style);
-        Children.Insert(Children.Count - 1, _text);
+        AddContent(_text);
         VideoStateChanged?.Invoke(this, EventArgs.Empty);
     }
+
+    private void AddContent(UIElement visual) => Children.Insert(Children.IndexOf(_clearCover), visual);
 
     private static void ApplyTextStyle(TextBlock block, SlideTextStyle style)
     {

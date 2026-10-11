@@ -20,6 +20,8 @@ This is Stephen Peck's personal Windows port of MxU Slides. Keep MxU's original 
 
 `StageCue.For` resolves current and next readable slide text across service item boundaries, including repeated presentations. The stage window uses this data plus live `ServiceRun` timing; it is session-only and never changes audience output. Keep the windowed preview usable on one monitor and reject fullscreen stage and audience windows targeting the same screen.
 
+`LiveOutputState` tracks cleared slides, active overlay, and blackout independently. Clear Slides masks the slide layer but leaves the overlay live; Clear All masks slides and clears the overlay. Blackout masks everything without forgetting either layer. A new show or opened show resets this session state. Thumbnails always show the saved slide design, not the live output masks.
+
 The Windows importer currently supports text objects and solid background colors from a standalone MxU Presentation JSON file. It does not read the macOS Automerge library or render advanced objects. Preserve unknown fields at the schema level; do not claim full library compatibility until it is implemented.
 
 Use `docs/windows-parity.md` as the feature inventory for the Windows port. Update it when behavior is implemented and verified on Windows; visual similarity alone does not close a parity gap.

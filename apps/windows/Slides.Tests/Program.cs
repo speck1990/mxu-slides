@@ -133,6 +133,24 @@ var cases = new (string Name, Action Run)[]
             "next cue skips an empty service item and reaches a repeated song");
         Check(StageCue.For(show, 2, 1).NextHeading == "End of service", "last cue ends service");
     }),
+    ("clear controls keep overlays and blackout independent", () =>
+    {
+        var output = new LiveOutputState();
+        output.FireOverlay("verse");
+        output.ClearSlides();
+        Check(output.SlidesCleared && output.ActiveOverlayId == "verse" && !output.IsBlack,
+            "clearing slides leaves the overlay live");
+        output.ToggleBlack();
+        Check(output.IsBlack && output.ActiveOverlayId == "verse", "blackout preserves the live overlay");
+        output.ToggleBlack();
+        output.FireSlide();
+        Check(!output.SlidesCleared && output.ActiveOverlayId == "verse", "firing restores the slide");
+        output.ClearAll();
+        Check(output.SlidesCleared && output.ActiveOverlayId is null && !output.IsBlack,
+            "clear all removes slide and overlay layers");
+        output.Reset();
+        Check(!output.SlidesCleared, "opening a show resets the output state");
+    }),
     ("live service timing follows occurrences and survives pause and reorder", () =>
     {
         var clock = new ManualClock();

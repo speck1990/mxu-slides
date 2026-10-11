@@ -58,21 +58,20 @@ public partial class MainWindow : Window
         "Slides", "packages");
     private Show _show = new() { ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
     private readonly ServiceRun _run = new();
+    private readonly LiveOutputState _output = new();
     private readonly DispatcherTimer _runDisplayTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly DispatcherTimer _videoDisplayTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private PresentationLibrary _library = new();
     private ProjectionWindow? _projection;
     private StageWindow? _stage;
-    private bool _black;
     private bool _ready;
     private bool _updatingDate;
     private bool _updatingVideoSlider;
     private bool _videoPaused;
     private Slide? _lastLiveSlide;
-    private string? _activeOverlayId;
 
     private Presentation? SelectedPresentation => (Presentations.SelectedItem as ServiceRow)?.Presentation;
-    private Overlay? ActiveOverlay => _show.Overlays.FirstOrDefault(item => item.Id == _activeOverlayId);
+    private Overlay? ActiveOverlay => _show.Overlays.FirstOrDefault(item => item.Id == _output.ActiveOverlayId);
     private int SelectedServiceIndex => (Presentations.SelectedItem as ServiceRow)?.ServiceIndex ?? -1;
 
     public MainWindow()
@@ -446,7 +445,7 @@ public partial class MainWindow : Window
             _library.ImportMissingOverlays(opened.Overlays);
             _library.RepairMissingMediaFrom(opened.Presentations);
             _show = opened;
-            _activeOverlayId = null;
+            _output.Reset();
             _run.Reset();
             _run.Select(null);
             Changed(0);
@@ -478,7 +477,7 @@ public partial class MainWindow : Window
         Try(() =>
         {
             _show = new Show { ServiceItems = [], ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
-            _activeOverlayId = null;
+            _output.Reset();
             _run.Reset();
             _run.Select(null);
             Changed(0);
@@ -511,7 +510,23 @@ public partial class MainWindow : Window
         else Render();
     }
 
-    private void OnSlideChanged(object sender, SelectionChangedEventArgs e) => Render();
+    private void OnSlideChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (Slides.SelectedItem is SlideCard) _output.FireSlide();
+        Render();
+    }
+
+    private void FireSelectedSlide(object sender, MouseButtonEventArgs e)
+    {
+        if (Slides.SelectedItem is not SlideCard) return;
+        _output.FireSlide();
+        _videoPaused = false;
+        Preview.SeekVideo(TimeSpan.Zero);
+        _projection?.SeekVideo(TimeSpan.Zero);
+        Preview.PlayVideo();
+        _projection?.PlayVideo();
+        Render();
+    }
 
     private void Render()
     {
@@ -521,8 +536,8 @@ public partial class MainWindow : Window
             _lastLiveSlide = slide;
             _videoPaused = false;
         }
-        Preview.Show(slide, _black, ActiveOverlay);
-        _projection?.ShowSlide(slide, _black, ActiveOverlay);
+        Preview.Show(slide, _output.IsBlack, ActiveOverlay, _output.SlidesCleared);
+        _projection?.ShowSlide(slide, _output.IsBlack, ActiveOverlay, _output.SlidesCleared);
         if (_videoPaused)
         {
             Preview.PauseVideo();
@@ -530,12 +545,18 @@ public partial class MainWindow : Window
         }
         RefreshVideoTransport();
         UpdateStage();
-        Status.Text = slide is null ? "No slide selected" : $"Slide {Slides.SelectedIndex + 1} of {Slides.Items.Count}";
+        BlackButton.Content = _output.IsBlack ? "Restore Screen  (B)" : "Black Screen  (B)";
+        Status.Text = _output.SlidesCleared ? "Slides cleared — double-click a slide to fire it" :
+            slide is null ? "No slide selected" : $"Slide {Slides.SelectedIndex + 1} of {Slides.Items.Count}";
     }
 
-    private void UpdateStage() => _stage?.Update(
-        StageCue.For(_show, SelectedServiceIndex, Slides.SelectedIndex),
-        _run.ServiceElapsed, _run.CurrentItemElapsed);
+    private void UpdateStage()
+    {
+        if (_stage is null) return;
+        var cue = StageCue.For(_show, SelectedServiceIndex, Slides.SelectedIndex);
+        if (_output.SlidesCleared) cue = cue with { CurrentHeading = "Slides cleared", CurrentText = "" };
+        _stage.Update(cue, _run.ServiceElapsed, _run.CurrentItemElapsed);
+    }
 
     private void ToggleVideo(object sender, RoutedEventArgs e)
     {
@@ -590,7 +611,7 @@ public partial class MainWindow : Window
         {
             _library.AddOverlayToShow(_show, overlay.Id);
             ShowFiles.Save(_autosavePath, _show);
-            _activeOverlayId = overlay.Id;
+            _output.FireOverlay(overlay.Id);
             Render();
         });
     }
@@ -599,7 +620,7 @@ public partial class MainWindow : Window
 
     private void ClearOverlay(object sender, RoutedEventArgs e)
     {
-        _activeOverlayId = null;
+        _output.ClearOverlay();
         Render();
     }
 
@@ -612,7 +633,7 @@ public partial class MainWindow : Window
         {
             _library.Overlays.RemoveAll(item => item.Id == overlay.Id);
             _show.Overlays.RemoveAll(item => item.Id == overlay.Id);
-            if (_activeOverlayId == overlay.Id) _activeOverlayId = null;
+            if (_output.ActiveOverlayId == overlay.Id) _output.ClearOverlay();
             LibraryFiles.Save(_libraryPath, _library);
             ShowFiles.Save(_autosavePath, _show);
             RefreshOverlays();
@@ -696,8 +717,21 @@ public partial class MainWindow : Window
 
     private void ToggleBlack(object sender, RoutedEventArgs e)
     {
-        _black = !_black;
-        BlackButton.Content = _black ? "Restore Screen  (B)" : "Black Screen  (B)";
+        _output.ToggleBlack();
+        Render();
+    }
+
+    private void ClearSlides(object sender, RoutedEventArgs e)
+    {
+        _output.ClearSlides();
+        _videoPaused = true;
+        Render();
+    }
+
+    private void ClearAll(object sender, RoutedEventArgs e)
+    {
+        _output.ClearAll();
+        _videoPaused = true;
         Render();
     }
 
