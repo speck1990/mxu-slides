@@ -152,6 +152,19 @@
           </ScrollViewer>
         </Grid>
         <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource Line}" />
+        <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="16,9">
+          <StackPanel>
+            <TextBlock x:Name="VideoName" Text="No video playing" Foreground="{StaticResource Muted}" FontSize="11" />
+            <Grid Margin="0,5,0,0">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <Button x:Name="VideoButton" Content="Pause" Click="ToggleVideo" IsEnabled="False" />
+              <Slider x:Name="VideoSlider" Grid.Column="1" Minimum="0" Maximum="1" IsEnabled="False"
+                      VerticalAlignment="Center" Margin="5,0,10,0" ValueChanged="SeekVideo" />
+              <TextBlock x:Name="VideoTime" Grid.Column="2" Text="00:00 / 00:00" Foreground="{StaticResource Muted}"
+                         FontFamily="Consolas" VerticalAlignment="Center" />
+            </Grid>
+          </StackPanel>
+        </Border>
         <ListBox x:Name="Slides" Margin="15,16,0,0" ItemContainerStyle="{StaticResource SlideItem}"
                  SelectionChanged="OnSlideChanged" ScrollViewer.VerticalScrollBarVisibility="Auto">
           <ListBox.ItemsPanel>

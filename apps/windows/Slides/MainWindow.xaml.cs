@@ -59,11 +59,15 @@ public partial class MainWindow : Window
     private Show _show = new() { ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
     private readonly ServiceRun _run = new();
     private readonly DispatcherTimer _runDisplayTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _videoDisplayTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private PresentationLibrary _library = new();
     private ProjectionWindow? _projection;
     private bool _black;
     private bool _ready;
     private bool _updatingDate;
+    private bool _updatingVideoSlider;
+    private bool _videoPaused;
+    private Slide? _lastLiveSlide;
 
     private Presentation? SelectedPresentation => (Presentations.SelectedItem as ServiceRow)?.Presentation;
     private int SelectedServiceIndex => (Presentations.SelectedItem as ServiceRow)?.ServiceIndex ?? -1;
@@ -88,6 +92,9 @@ public partial class MainWindow : Window
         RefreshPresentations();
         _runDisplayTimer.Tick += (_, _) => RefreshRunDisplay();
         _runDisplayTimer.Start();
+        _videoDisplayTimer.Tick += (_, _) => RefreshVideoTransport();
+        _videoDisplayTimer.Start();
+        Preview.VideoStateChanged += (_, _) => RefreshVideoTransport();
         _ready = true;
     }
 
@@ -487,9 +494,64 @@ public partial class MainWindow : Window
     private void Render()
     {
         var slide = (Slides.SelectedItem as SlideCard)?.Slide;
+        if (!ReferenceEquals(slide, _lastLiveSlide))
+        {
+            _lastLiveSlide = slide;
+            _videoPaused = false;
+        }
         Preview.Show(slide, _black);
         _projection?.ShowSlide(slide, _black);
+        if (_videoPaused)
+        {
+            Preview.PauseVideo();
+            _projection?.PauseVideo();
+        }
+        RefreshVideoTransport();
         Status.Text = slide is null ? "No slide selected" : $"Slide {Slides.SelectedIndex + 1} of {Slides.Items.Count}";
+    }
+
+    private void ToggleVideo(object sender, RoutedEventArgs e)
+    {
+        if (!Preview.HasVideo) return;
+        _videoPaused = !_videoPaused;
+        if (_videoPaused)
+        {
+            Preview.PauseVideo();
+            _projection?.PauseVideo();
+        }
+        else
+        {
+            Preview.PlayVideo();
+            _projection?.PlayVideo();
+        }
+        RefreshVideoTransport();
+    }
+
+    private void SeekVideo(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_ready || _updatingVideoSlider || !Preview.HasVideo) return;
+        var position = TimeSpan.FromSeconds(VideoSlider.Value);
+        Preview.SeekVideo(position);
+        _projection?.SeekVideo(position);
+        RefreshVideoTransport();
+    }
+
+    private void RefreshVideoTransport()
+    {
+        if (VideoSlider is null) return;
+        var duration = Preview.VideoDuration;
+        var position = Preview.VideoPosition;
+        VideoName.Text = Preview.HasVideo
+            ? (Slides.SelectedItem as SlideCard)?.Name ?? "Video"
+            : "No video playing";
+        VideoButton.IsEnabled = Preview.HasVideo;
+        VideoButton.Content = _videoPaused ? "Play" : "Pause";
+        VideoSlider.IsEnabled = Preview.HasVideo && duration > TimeSpan.Zero;
+        _updatingVideoSlider = true;
+        VideoSlider.Maximum = duration > TimeSpan.Zero ? duration.TotalSeconds : 1;
+        VideoSlider.Value = Math.Clamp(position.TotalSeconds, 0, VideoSlider.Maximum);
+        _updatingVideoSlider = false;
+        VideoTime.Text = $"{FormatTime(position)} / {FormatTime(duration)}";
     }
 
     private void ToggleProjection(object sender, RoutedEventArgs e)
@@ -598,6 +660,7 @@ public partial class MainWindow : Window
     private void OnClosing(object? sender, CancelEventArgs e)
     {
         _runDisplayTimer.Stop();
+        _videoDisplayTimer.Stop();
         _projection?.Close();
     }
 

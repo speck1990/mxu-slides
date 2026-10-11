@@ -4,6 +4,7 @@
 
 ### Added
 
+- Windows video transport with play/pause, seek, elapsed/duration readout, and matching controls for preview and audience projection.
 - Windows live service controls with start, pause, resume, and reset timing; per-occurrence elapsed and remaining time; operator notes; and slide navigation across service items.
 - Windows service planning with a saved service date, section headings, per-occurrence operator notes and planned minutes, and a total planned duration in Service Flow.
 - Windows slide objects now support rotation, opacity, and horizontal or vertical flipping, including these fields from standalone MxU Presentation JSON.

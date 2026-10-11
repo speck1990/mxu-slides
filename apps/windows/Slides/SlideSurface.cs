@@ -33,6 +33,42 @@ public sealed class SlideSurface : Grid
 
     private MediaElement? _video;
     private bool _black;
+    private bool _surfaceReady;
+    private bool _renderedAsThumbnail;
+    private Slide? _displayedSlide;
+    private bool _videoPlaying;
+    private readonly Border _blackCover = new() { Background = Brushes.Black, Visibility = Visibility.Collapsed };
+    public event EventHandler? VideoStateChanged;
+
+    public bool HasVideo => _video is not null;
+    public bool VideoPlaying => _video is not null && _videoPlaying;
+    public TimeSpan VideoPosition => _video?.Position ?? TimeSpan.Zero;
+    public TimeSpan VideoDuration => _video?.NaturalDuration.HasTimeSpan == true
+        ? _video.NaturalDuration.TimeSpan : TimeSpan.Zero;
+
+    public void PlayVideo()
+    {
+        if (_video is null) return;
+        _video.Play();
+        _videoPlaying = true;
+        VideoStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void PauseVideo()
+    {
+        if (_video is null) return;
+        _video.Pause();
+        _videoPlaying = false;
+        VideoStateChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void SeekVideo(TimeSpan position)
+    {
+        if (_video is null) return;
+        _video.Position = position < TimeSpan.Zero ? TimeSpan.Zero :
+            VideoDuration > TimeSpan.Zero && position > VideoDuration ? VideoDuration : position;
+        VideoStateChanged?.Invoke(this, EventArgs.Empty);
+    }
     private readonly TextBlock _text = new()
     {
         Foreground = Brushes.White,
@@ -52,22 +88,31 @@ public sealed class SlideSurface : Grid
     public void Show(Slide? slide, bool black)
     {
         _black = black;
+        if (!_surfaceReady || !ReferenceEquals(_displayedSlide, slide) || _renderedAsThumbnail != IsThumbnail)
+        {
+            _displayedSlide = slide;
+            _renderedAsThumbnail = IsThumbnail;
+            Rebuild(slide);
+            _surfaceReady = true;
+        }
+        _blackCover.Visibility = black ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void Rebuild(Slide? slide)
+    {
         _video?.Stop();
         _video = null;
+        _videoPlaying = false;
         Children.Clear();
         Background = Brush(slide?.Background ?? "#0B1220");
-        if (black)
-        {
-            Background = Brushes.Black;
-            return;
-        }
+        Children.Add(_blackCover);
         if (slide?.MediaPath is { Length: > 0 } path && File.Exists(path))
         {
             var uri = new Uri(Path.GetFullPath(path));
             if (new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif" }
                 .Contains(Path.GetExtension(path).ToLowerInvariant()))
             {
-                Children.Add(new Image
+                Children.Insert(Children.Count - 1, new Image
                 {
                     Source = new BitmapImage(uri),
                     Stretch = Stretch.UniformToFill
@@ -77,7 +122,7 @@ public sealed class SlideSurface : Grid
             {
                 if (IsThumbnail)
                 {
-                    Children.Add(new TextBlock
+                    Children.Insert(Children.Count - 1, new TextBlock
                     {
                         Text = "▶",
                         FontSize = 110,
@@ -95,9 +140,12 @@ public sealed class SlideSurface : Grid
                         UnloadedBehavior = MediaState.Stop,
                         Stretch = Stretch.UniformToFill
                     };
-                    _video.MediaEnded += (_, _) => { _video.Position = TimeSpan.Zero; _video.Play(); };
-                    Children.Add(_video);
+                    var video = _video;
+                    video.MediaEnded += (_, _) => { video.Position = TimeSpan.Zero; video.Play(); };
+                    _video.MediaOpened += (_, _) => VideoStateChanged?.Invoke(this, EventArgs.Empty);
+                    Children.Insert(Children.Count - 1, _video);
                     _video.Play();
+                    _videoPlaying = true;
                 }
             }
         }
@@ -160,13 +208,15 @@ public sealed class SlideSurface : Grid
                 Canvas.SetTop(visual, element.Y);
                 canvas.Children.Add(visual);
             }
-            Children.Add(canvas);
+            Children.Insert(Children.Count - 1, canvas);
+            VideoStateChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
         _text.Text = slide?.Text ?? "Select a slide";
         var style = slide is null ? new SlideTextStyle { FontSize = 36 } : SlideThemes.Effective(slide);
         ApplyTextStyle(_text, style);
-        Children.Add(_text);
+        Children.Insert(Children.Count - 1, _text);
+        VideoStateChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private static void ApplyTextStyle(TextBlock block, SlideTextStyle style)

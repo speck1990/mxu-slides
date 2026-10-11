@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -28,4 +29,7 @@ public sealed class ProjectionWindow : Window
     }
 
     public void ShowSlide(Slides.Core.Slide? slide, bool black) => _surface.Show(slide, black);
+    public void PlayVideo() => _surface.PlayVideo();
+    public void PauseVideo() => _surface.PauseVideo();
+    public void SeekVideo(TimeSpan position) => _surface.SeekVideo(position);
 }
