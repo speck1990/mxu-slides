@@ -86,6 +86,75 @@ var cases = new (string Name, Action Run)[]
         try { show.EnsureServiceItems(); throw new Exception("FAIL mismatched service details accepted"); }
         catch (InvalidDataException) { }
     }),
+    ("overlays stay in the library and portable show", () =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var libraryPath = Path.Combine(folder, "library.json");
+            var showPath = Path.Combine(folder, "service.pshow");
+            var packagePath = Path.Combine(folder, "service.slidespack");
+            var overlay = new Overlay { Name = "Verse + Reference", Text = "John 3:16\nFor God so loved the world" };
+            var library = new PresentationLibrary();
+            library.UpsertOverlay(overlay);
+            var show = new Show { ServiceItems = [] };
+            library.AddOverlayToShow(show, overlay.Id);
+            LibraryFiles.Save(libraryPath, library);
+            ShowFiles.Save(showPath, show);
+            ShowPackage.Save(packagePath, show);
+            Check(LibraryFiles.Load(libraryPath).Overlays.Single().Text == overlay.Text,
+                "overlay remains available after library reload");
+            Check(ShowFiles.Load(showPath).Overlays.Single().Name == overlay.Name &&
+                ShowPackage.Open(packagePath, Path.Combine(folder, "cache")).Overlays.Single().Id == overlay.Id,
+                "overlay survives show and package round trips");
+            var recoveredLibrary = new PresentationLibrary();
+            Check(recoveredLibrary.ImportMissingOverlays(ShowFiles.Load(showPath).Overlays) &&
+                recoveredLibrary.Overlays.Single().Id == overlay.Id,
+                "autosaved show can restore missing overlay library entries");
+            var nextShow = new Show { ServiceItems = [] };
+            LibraryFiles.Load(libraryPath).AddOverlayToShow(nextShow, overlay.Id);
+            Check(nextShow.Overlays.Single().Id == overlay.Id, "overlay can be reused in a new show");
+            overlay.Layout = "unsupported";
+            try { library.UpsertOverlay(overlay); throw new Exception("FAIL invalid overlay accepted"); }
+            catch (InvalidDataException) { }
+        }
+        finally { Directory.Delete(folder, true); }
+    }),
+    ("stage cue shows current, next, and notes across service items", () =>
+    {
+        var song = SongParser.Parse("Song", "[Verse 1]\nFirst\n\n[Chorus]\nSecond");
+        var empty = new Presentation { Name = "Empty" };
+        var show = new Show { Presentations = [song, empty], ServiceItems = [song.Id, empty.Id, song.Id] };
+        show.EnsureServiceItems();
+        show.UpdateServiceItem(0, "Service", "Sing softly", 4);
+        var first = StageCue.For(show, 0, 0);
+        Check(first.CurrentText == "First" && first.NextText == "Second" &&
+            first.OperatorNotes == "Sing softly" && first.PlannedMinutes == 4,
+            "current verse, next verse, and notes");
+        var boundary = StageCue.For(show, 0, 1);
+        Check(boundary.NextHeading.StartsWith("Song") && boundary.NextText == "First",
+            "next cue skips an empty service item and reaches a repeated song");
+        Check(StageCue.For(show, 2, 1).NextHeading == "End of service", "last cue ends service");
+    }),
+    ("clear controls keep overlays and blackout independent", () =>
+    {
+        var output = new LiveOutputState();
+        output.FireOverlay("verse");
+        output.ClearSlides();
+        Check(output.SlidesCleared && output.ActiveOverlayId == "verse" && !output.IsBlack,
+            "clearing slides leaves the overlay live");
+        output.ToggleBlack();
+        Check(output.IsBlack && output.ActiveOverlayId == "verse", "blackout preserves the live overlay");
+        output.ToggleBlack();
+        output.FireSlide();
+        Check(!output.SlidesCleared && output.ActiveOverlayId == "verse", "firing restores the slide");
+        output.ClearAll();
+        Check(output.SlidesCleared && output.ActiveOverlayId is null && !output.IsBlack,
+            "clear all removes slide and overlay layers");
+        output.Reset();
+        Check(!output.SlidesCleared, "opening a show resets the output state");
+    }),
     ("live service timing follows occurrences and survives pause and reorder", () =>
     {
         var clock = new ManualClock();

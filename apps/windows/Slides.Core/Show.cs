@@ -12,6 +12,8 @@ public sealed class Show
     // One planning record per service occurrence, including repeated presentations.
     public List<ServiceItemDetails>? ServiceDetails { get; set; }
     public DateOnly? ServiceDate { get; set; }
+    // Show-local snapshots of reusable overlays, included in portable packages.
+    public List<Overlay> Overlays { get; set; } = [];
 
     public void EnsureServiceItems()
     {
@@ -151,12 +153,14 @@ public static class ShowFiles
         foreach (var presentation in show.Presentations)
             SongParser.RepairLegacyHeadings(presentation);
         show.EnsureServiceItems();
+        Overlay.ValidateList(show.Overlays);
         return show;
     }
 
     public static void Save(string path, Show show)
     {
         show.EnsureServiceItems();
+        Overlay.ValidateList(show.Overlays);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(show, Json));

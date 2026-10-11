@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -9,9 +10,13 @@ namespace Slides;
 public sealed class ProjectionWindow : Window
 {
     private readonly SlideSurface _surface = new() { Width = 960, Height = 540 };
+    public string DisplayDeviceName { get; }
+    public event EventHandler? VideoOpened;
 
     public ProjectionWindow(Forms.Screen display)
     {
+        DisplayDeviceName = display.DeviceName;
+        _surface.VideoOpened += (_, _) => VideoOpened?.Invoke(this, EventArgs.Empty);
         Title = "Slides Audience";
         Content = new Viewbox { Child = _surface, Stretch = Stretch.Uniform };
         Background = System.Windows.Media.Brushes.Black;
@@ -27,5 +32,9 @@ public sealed class ProjectionWindow : Window
         KeyDown += (_, args) => { if (args.Key == Key.Escape) Close(); };
     }
 
-    public void ShowSlide(Slides.Core.Slide? slide, bool black) => _surface.Show(slide, black);
+    public void ShowSlide(Slides.Core.Slide? slide, bool black, Slides.Core.Overlay? overlay = null,
+        bool clear = false) => _surface.Show(slide, black, overlay, clear);
+    public void PlayVideo() => _surface.PlayVideo();
+    public void PauseVideo() => _surface.PauseVideo();
+    public void SeekVideo(TimeSpan position) => _surface.SeekVideo(position);
 }

@@ -58,36 +58,54 @@ public partial class MainWindow : Window
         "Slides", "packages");
     private Show _show = new() { ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
     private readonly ServiceRun _run = new();
+    private readonly LiveOutputState _output = new();
     private readonly DispatcherTimer _runDisplayTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    private readonly DispatcherTimer _videoDisplayTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private PresentationLibrary _library = new();
     private ProjectionWindow? _projection;
-    private bool _black;
+    private StageWindow? _stage;
     private bool _ready;
     private bool _updatingDate;
+    private bool _updatingVideoSlider;
+    private bool _videoPaused;
+    private Slide? _lastLiveSlide;
 
     private Presentation? SelectedPresentation => (Presentations.SelectedItem as ServiceRow)?.Presentation;
+    private Overlay? ActiveOverlay => _show.Overlays.FirstOrDefault(item => item.Id == _output.ActiveOverlayId);
     private int SelectedServiceIndex => (Presentations.SelectedItem as ServiceRow)?.ServiceIndex ?? -1;
 
     public MainWindow()
     {
         InitializeComponent();
+        StageDisplaySelector.Items.Add("Windowed preview");
         foreach (var screen in Forms.Screen.AllScreens)
+        {
             DisplaySelector.Items.Add($"{screen.DeviceName} ({screen.Bounds.Width} × {screen.Bounds.Height})"
                 + (screen.Primary ? " Primary" : ""));
+            StageDisplaySelector.Items.Add($"{screen.DeviceName} ({screen.Bounds.Width} × {screen.Bounds.Height})"
+                + (screen.Primary ? " Primary" : ""));
+        }
+        StageDisplaySelector.SelectedIndex = 0;
         var secondary = Array.FindIndex(Forms.Screen.AllScreens, screen => !screen.Primary);
         DisplaySelector.SelectedIndex = secondary >= 0 ? secondary : 0;
         try
         {
             _library = LibraryFiles.Load(_libraryPath);
             if (File.Exists(_autosavePath)) _show = ShowFiles.Load(_autosavePath);
-            if (_library.ImportMissing(_show.Presentations) || !File.Exists(_libraryPath))
+            var importedPresentations = _library.ImportMissing(_show.Presentations);
+            var importedOverlays = _library.ImportMissingOverlays(_show.Overlays);
+            if (importedPresentations || importedOverlays || !File.Exists(_libraryPath))
                 LibraryFiles.Save(_libraryPath, _library);
         }
         catch (Exception ex) { MessageBox.Show($"Could not restore Slides data: {ex.Message}"); }
         RefreshFolderChoices();
         RefreshPresentations();
+        RefreshOverlays();
         _runDisplayTimer.Tick += (_, _) => RefreshRunDisplay();
         _runDisplayTimer.Start();
+        _videoDisplayTimer.Tick += (_, _) => RefreshVideoTransport();
+        _videoDisplayTimer.Start();
+        Preview.VideoStateChanged += (_, _) => RefreshVideoTransport();
         _ready = true;
     }
 
@@ -166,6 +184,15 @@ public partial class MainWindow : Window
         LibraryList.ItemsSource = visible;
         LibraryList.SelectedItem = visible.FirstOrDefault(presentation => presentation.Id == selectedId)
             ?? visible.FirstOrDefault();
+    }
+
+    private void RefreshOverlays(string? selectedId = null)
+    {
+        selectedId ??= (OverlaysList.SelectedItem as Overlay)?.Id;
+        var overlays = _library.Overlays.OrderBy(item => item.Name).ToArray();
+        OverlaysList.ItemsSource = overlays;
+        OverlaysList.SelectedItem = overlays.FirstOrDefault(item => item.Id == selectedId)
+            ?? overlays.FirstOrDefault();
     }
 
     private void OnLibrarySearchChanged(object sender, TextChangedEventArgs e) => RefreshLibrary();
@@ -417,8 +444,10 @@ public partial class MainWindow : Window
                 ? ShowPackage.Open(picker.FileName, _packageCachePath)
                 : ShowFiles.Load(picker.FileName);
             _library.ImportMissing(opened.Presentations);
+            _library.ImportMissingOverlays(opened.Overlays);
             _library.RepairMissingMediaFrom(opened.Presentations);
             _show = opened;
+            _output.Reset();
             _run.Reset();
             _run.Select(null);
             Changed(0);
@@ -450,6 +479,7 @@ public partial class MainWindow : Window
         Try(() =>
         {
             _show = new Show { ServiceItems = [], ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
+            _output.Reset();
             _run.Reset();
             _run.Select(null);
             Changed(0);
@@ -482,14 +512,162 @@ public partial class MainWindow : Window
         else Render();
     }
 
-    private void OnSlideChanged(object sender, SelectionChangedEventArgs e) => Render();
+    private void OnSlideChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (Slides.SelectedItem is SlideCard) _output.FireSlide();
+        Render();
+    }
+
+    private void FireSelectedSlide(object sender, MouseButtonEventArgs e)
+    {
+        if (Slides.SelectedItem is not SlideCard) return;
+        _output.FireSlide();
+        _videoPaused = false;
+        Preview.SeekVideo(TimeSpan.Zero);
+        _projection?.SeekVideo(TimeSpan.Zero);
+        Preview.PlayVideo();
+        _projection?.PlayVideo();
+        Render();
+    }
 
     private void Render()
     {
         var slide = (Slides.SelectedItem as SlideCard)?.Slide;
-        Preview.Show(slide, _black);
-        _projection?.ShowSlide(slide, _black);
-        Status.Text = slide is null ? "No slide selected" : $"Slide {Slides.SelectedIndex + 1} of {Slides.Items.Count}";
+        if (!ReferenceEquals(slide, _lastLiveSlide))
+        {
+            _lastLiveSlide = slide;
+            _videoPaused = false;
+        }
+        Preview.Show(slide, _output.IsBlack, ActiveOverlay, _output.SlidesCleared);
+        _projection?.ShowSlide(slide, _output.IsBlack, ActiveOverlay, _output.SlidesCleared);
+        if (_videoPaused)
+        {
+            Preview.PauseVideo();
+            _projection?.PauseVideo();
+        }
+        RefreshVideoTransport();
+        UpdateStage();
+        BlackButton.Content = _output.IsBlack ? "Restore Screen  (B)" : "Black Screen  (B)";
+        Status.Text = _output.SlidesCleared ? "Slides cleared — double-click a slide to fire it" :
+            slide is null ? "No slide selected" : $"Slide {Slides.SelectedIndex + 1} of {Slides.Items.Count}";
+    }
+
+    private void UpdateStage()
+    {
+        if (_stage is null) return;
+        var cue = StageCue.For(_show, SelectedServiceIndex, Slides.SelectedIndex);
+        if (_output.SlidesCleared) cue = cue with { CurrentHeading = "Slides cleared", CurrentText = "" };
+        _stage.Update(cue, _run.ServiceElapsed, _run.CurrentItemElapsed);
+    }
+
+    private void ToggleVideo(object sender, RoutedEventArgs e)
+    {
+        if (!Preview.HasVideo) return;
+        _videoPaused = !_videoPaused;
+        if (_videoPaused)
+        {
+            Preview.PauseVideo();
+            _projection?.PauseVideo();
+        }
+        else
+        {
+            Preview.PlayVideo();
+            _projection?.PlayVideo();
+        }
+        RefreshVideoTransport();
+    }
+
+    private void NewOverlay(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OverlayDialog { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.EditedOverlay is not { } overlay) return;
+        Try(() =>
+        {
+            _library.UpsertOverlay(overlay);
+            LibraryFiles.Save(_libraryPath, _library);
+            RefreshOverlays(overlay.Id);
+        });
+    }
+
+    private void EditOverlay(object sender, RoutedEventArgs e)
+    {
+        if (OverlaysList.SelectedItem is not Overlay source) return;
+        var dialog = new OverlayDialog(source) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.EditedOverlay is not { } overlay) return;
+        Try(() =>
+        {
+            _library.UpsertOverlay(overlay);
+            if (_show.Overlays.Any(item => item.Id == overlay.Id))
+                _library.AddOverlayToShow(_show, overlay.Id);
+            LibraryFiles.Save(_libraryPath, _library);
+            ShowFiles.Save(_autosavePath, _show);
+            RefreshOverlays(overlay.Id);
+            Render();
+        });
+    }
+
+    private void FireOverlay(object sender, RoutedEventArgs e)
+    {
+        if (OverlaysList.SelectedItem is not Overlay overlay) return;
+        Try(() =>
+        {
+            _library.AddOverlayToShow(_show, overlay.Id);
+            ShowFiles.Save(_autosavePath, _show);
+            _output.FireOverlay(overlay.Id);
+            Render();
+        });
+    }
+
+    private void OnOverlayDoubleClick(object sender, MouseButtonEventArgs e) => FireOverlay(sender, e);
+
+    private void ClearOverlay(object sender, RoutedEventArgs e)
+    {
+        _output.ClearOverlay();
+        Render();
+    }
+
+    private void DeleteOverlay(object sender, RoutedEventArgs e)
+    {
+        if (OverlaysList.SelectedItem is not Overlay overlay) return;
+        if (MessageBox.Show(this, $"Delete {overlay.Name} from the overlay library?", "Slides",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Try(() =>
+        {
+            _library.Overlays.RemoveAll(item => item.Id == overlay.Id);
+            _show.Overlays.RemoveAll(item => item.Id == overlay.Id);
+            if (_output.ActiveOverlayId == overlay.Id) _output.ClearOverlay();
+            LibraryFiles.Save(_libraryPath, _library);
+            ShowFiles.Save(_autosavePath, _show);
+            RefreshOverlays();
+            Render();
+        });
+    }
+
+    private void SeekVideo(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (!_ready || _updatingVideoSlider || !Preview.HasVideo) return;
+        var position = TimeSpan.FromSeconds(VideoSlider.Value);
+        Preview.SeekVideo(position);
+        _projection?.SeekVideo(position);
+        RefreshVideoTransport();
+    }
+
+    private void RefreshVideoTransport()
+    {
+        if (VideoSlider is null) return;
+        var duration = Preview.VideoDuration;
+        var position = Preview.VideoPosition;
+        VideoName.Text = Preview.HasVideo
+            ? (Slides.SelectedItem as SlideCard)?.Name ?? "Video"
+            : "No video playing";
+        VideoButton.IsEnabled = Preview.HasVideo;
+        VideoButton.Content = _videoPaused ? "Play" : "Pause";
+        VideoSlider.IsEnabled = Preview.HasVideo && duration > TimeSpan.Zero;
+        _updatingVideoSlider = true;
+        VideoSlider.Maximum = duration > TimeSpan.Zero ? duration.TotalSeconds : 1;
+        VideoSlider.Value = Math.Clamp(position.TotalSeconds, 0, VideoSlider.Maximum);
+        _updatingVideoSlider = false;
+        VideoTime.Text = $"{FormatTime(position)} / {FormatTime(duration)}";
     }
 
     private void ToggleProjection(object sender, RoutedEventArgs e)
@@ -498,8 +676,20 @@ public partial class MainWindow : Window
         var screens = Forms.Screen.AllScreens;
         if (screens.Length == 0) { MessageBox.Show("No display detected."); return; }
         var index = Math.Clamp(DisplaySelector.SelectedIndex, 0, screens.Length - 1);
-        _projection = new ProjectionWindow(screens[index]);
-        _projection.Closed += (_, _) =>
+        if (_stage?.DisplayDeviceName == screens[index].DeviceName)
+        {
+            MessageBox.Show(this, "The stage display is using that screen. Choose another audience display or close the stage display.", "Slides");
+            return;
+        }
+        var projection = new ProjectionWindow(screens[index]);
+        _projection = projection;
+        projection.VideoOpened += (_, _) =>
+        {
+            if (!ReferenceEquals(_projection, projection)) return;
+            projection.SeekVideo(Preview.VideoPosition);
+            if (_videoPaused) projection.PauseVideo();
+        };
+        projection.Closed += (_, _) =>
         {
             _projection = null;
             ProjectButton.Content = "Start Projection  (F5)";
@@ -511,10 +701,46 @@ public partial class MainWindow : Window
         Activate();
     }
 
+    private void ToggleStage(object sender, RoutedEventArgs e)
+    {
+        if (_stage is not null) { _stage.Close(); return; }
+        var index = StageDisplaySelector.SelectedIndex - 1;
+        var screens = Forms.Screen.AllScreens;
+        if (index >= screens.Length) return;
+        var display = index >= 0 ? screens[index] : null;
+        if (display is not null && _projection?.DisplayDeviceName == display.DeviceName)
+        {
+            MessageBox.Show(this, "Audience projection is using that screen. Choose another stage display or use Windowed preview.", "Slides");
+            return;
+        }
+        _stage = new StageWindow(display);
+        _stage.Closed += (_, _) =>
+        {
+            _stage = null;
+            StageButton.Content = "Open Stage Display";
+        };
+        _stage.Show();
+        StageButton.Content = "Close Stage Display";
+        UpdateStage();
+    }
+
     private void ToggleBlack(object sender, RoutedEventArgs e)
     {
-        _black = !_black;
-        BlackButton.Content = _black ? "Restore Screen  (B)" : "Black Screen  (B)";
+        _output.ToggleBlack();
+        Render();
+    }
+
+    private void ClearSlides(object sender, RoutedEventArgs e)
+    {
+        _output.ClearSlides();
+        _videoPaused = true;
+        Render();
+    }
+
+    private void ClearAll(object sender, RoutedEventArgs e)
+    {
+        _output.ClearAll();
+        _videoPaused = true;
         Render();
     }
 
@@ -577,6 +803,7 @@ public partial class MainWindow : Window
             : "";
         var note = row?.Details.Notes;
         OperatorNote.Text = string.IsNullOrEmpty(note) ? "" : "Operator notes: " + note;
+        UpdateStage();
     }
 
     private static string FormatTime(TimeSpan time) =>
@@ -598,7 +825,9 @@ public partial class MainWindow : Window
     private void OnClosing(object? sender, CancelEventArgs e)
     {
         _runDisplayTimer.Stop();
+        _videoDisplayTimer.Stop();
         _projection?.Close();
+        _stage?.Close();
     }
 
     private void Try(Action operation)

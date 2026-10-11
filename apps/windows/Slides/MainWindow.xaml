@@ -152,8 +152,22 @@
           </ScrollViewer>
         </Grid>
         <Border DockPanel.Dock="Top" Height="1" Background="{StaticResource Line}" />
+        <Border DockPanel.Dock="Bottom" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="16,9">
+          <StackPanel>
+            <TextBlock x:Name="VideoName" Text="No video playing" Foreground="{StaticResource Muted}" FontSize="11" />
+            <Grid Margin="0,5,0,0">
+              <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+              <Button x:Name="VideoButton" Content="Pause" Click="ToggleVideo" IsEnabled="False" />
+              <Slider x:Name="VideoSlider" Grid.Column="1" Minimum="0" Maximum="1" IsEnabled="False"
+                      VerticalAlignment="Center" Margin="5,0,10,0" ValueChanged="SeekVideo" />
+              <TextBlock x:Name="VideoTime" Grid.Column="2" Text="00:00 / 00:00" Foreground="{StaticResource Muted}"
+                         FontFamily="Consolas" VerticalAlignment="Center" />
+            </Grid>
+          </StackPanel>
+        </Border>
         <ListBox x:Name="Slides" Margin="15,16,0,0" ItemContainerStyle="{StaticResource SlideItem}"
-                 SelectionChanged="OnSlideChanged" ScrollViewer.VerticalScrollBarVisibility="Auto">
+                 SelectionChanged="OnSlideChanged" MouseDoubleClick="FireSelectedSlide"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto">
           <ListBox.ItemsPanel>
             <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
           </ListBox.ItemsPanel>
@@ -190,6 +204,9 @@
           <TextBlock Text="AUDIENCE DISPLAY" Foreground="{StaticResource Muted}" FontSize="11" FontWeight="SemiBold" Margin="0,12,0,5" />
           <ComboBox x:Name="DisplaySelector" Background="#343438" Foreground="White" Margin="0,0,0,10" />
           <Button x:Name="ProjectButton" Content="Start Projection  (F5)" Click="ToggleProjection" Margin="0,0,0,8" />
+          <TextBlock Text="STAGE DISPLAY" Foreground="{StaticResource Muted}" FontSize="11" FontWeight="SemiBold" Margin="0,5,0,5" />
+          <ComboBox x:Name="StageDisplaySelector" Background="#343438" Foreground="White" Margin="0,0,0,7" />
+          <Button x:Name="StageButton" Content="Open Stage Display" Click="ToggleStage" Margin="0,0,0,10" />
           <WrapPanel>
             <Button Content="← Previous" Click="Previous" />
             <Button Content="Next →" Click="Next" />
@@ -199,6 +216,10 @@
             <Button Content="Next Item →" Click="NextItem" />
           </WrapPanel>
           <Button x:Name="BlackButton" Content="Black Screen  (B)" Click="ToggleBlack" Margin="0,8,0,0" />
+          <WrapPanel Margin="0,7,0,0">
+            <Button Content="Clear Slides" Click="ClearSlides" />
+            <Button Content="Clear All" Click="ClearAll" />
+          </WrapPanel>
           <TextBlock x:Name="Status" Foreground="{StaticResource Muted}" Margin="0,14,0,0" />
           <TextBlock Text="LIVE SERVICE" Foreground="{StaticResource Muted}" FontSize="11" FontWeight="SemiBold" Margin="0,18,0,7" />
           <WrapPanel>
@@ -209,6 +230,16 @@
           <TextBlock x:Name="ItemRunStatus" Margin="0,5,0,0" />
           <TextBlock x:Name="RemainingStatus" Margin="0,5,0,0" Foreground="#32C55C" />
           <TextBlock x:Name="OperatorNote" Margin="0,12,0,0" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+          <TextBlock Text="OVERLAYS" Foreground="{StaticResource Muted}" FontSize="11" FontWeight="SemiBold" Margin="0,18,0,7" />
+          <ListBox x:Name="OverlaysList" Height="110" ItemContainerStyle="{StaticResource SidebarItem}"
+                   DisplayMemberPath="Name" MouseDoubleClick="OnOverlayDoubleClick" />
+          <WrapPanel Margin="0,7,0,0">
+            <Button Content="New" Click="NewOverlay" />
+            <Button Content="Edit" Click="EditOverlay" />
+            <Button Content="Fire" Click="FireOverlay" />
+            <Button Content="Clear Overlay" Click="ClearOverlay" />
+          </WrapPanel>
+          <Button Content="Delete Selected Overlay" Click="DeleteOverlay" Margin="0,6,0,0" />
         </StackPanel>
         </ScrollViewer>
       </DockPanel>

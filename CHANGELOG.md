@@ -4,6 +4,10 @@
 
 ### Added
 
+- Windows video transport with play/pause, seek, elapsed/duration readout, and matching controls for preview and audience projection.
+- Windows reusable text overlays with lower-third or full-screen placement, starter looks, a persistent local library, live/clear controls, and portable show snapshots.
+- Windows stage display with current and next slide text, operator notes, service and item timing, windowed preview, and an optional dedicated fullscreen monitor.
+- Windows Clear Slides and Clear All controls, separate from blackout; clearing slides keeps the live overlay, while clearing all removes both layers.
 - Windows live service controls with start, pause, resume, and reset timing; per-occurrence elapsed and remaining time; operator notes; and slide navigation across service items.
 - Windows service planning with a saved service date, section headings, per-occurrence operator notes and planned minutes, and a total planned duration in Service Flow.
 - Windows slide objects now support rotation, opacity, and horizontal or vertical flipping, including these fields from standalone MxU Presentation JSON.
@@ -26,6 +30,8 @@
 
 ### Fixed
 
+- Opening audience projection during an active video now seeks the audience player to the preview position when its media opens.
+- Startup restores missing overlay library entries from the autosaved show.
 - Copying presentations through the Windows library now retains per-slide typography and positioned objects.
 
 ### Known limits

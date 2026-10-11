@@ -6,6 +6,7 @@ public sealed class PresentationLibrary
 {
     public int Version { get; set; } = 1;
     public List<Presentation> Presentations { get; set; } = [];
+    public List<Overlay> Overlays { get; set; } = [];
     public List<LibraryFolder> Folders { get; set; } = [];
     // Missing assignment means the presentation is at the top level.
     public Dictionary<string, string> FolderAssignments { get; set; } = [];
@@ -117,6 +118,36 @@ public sealed class PresentationLibrary
         else Presentations[index] = copy;
     }
 
+    public bool ImportMissingOverlays(IEnumerable<Overlay> overlays)
+    {
+        var known = Overlays.Select(overlay => overlay.Id).ToHashSet();
+        var added = false;
+        foreach (var overlay in overlays)
+        {
+            if (!known.Add(overlay.Id)) continue;
+            Overlays.Add(Overlay.Copy(overlay));
+            added = true;
+        }
+        return added;
+    }
+
+    public void UpsertOverlay(Overlay overlay)
+    {
+        Overlay.ValidateList([overlay]);
+        var index = Overlays.FindIndex(item => item.Id == overlay.Id);
+        if (index < 0) Overlays.Add(Overlay.Copy(overlay));
+        else Overlays[index] = Overlay.Copy(overlay);
+    }
+
+    public void AddOverlayToShow(Show show, string overlayId)
+    {
+        var source = Overlays.FirstOrDefault(item => item.Id == overlayId)
+            ?? throw new ArgumentException("Choose an overlay from the library.", nameof(overlayId));
+        var index = show.Overlays.FindIndex(item => item.Id == overlayId);
+        if (index < 0) show.Overlays.Add(Overlay.Copy(source));
+        else show.Overlays[index] = Overlay.Copy(source);
+    }
+
     public void AddToShow(Show show, string presentationId)
     {
         var source = Presentations.FirstOrDefault(item => item.Id == presentationId)
@@ -142,9 +173,10 @@ public static class LibraryFiles
         if (!File.Exists(path)) return new PresentationLibrary();
         var library = JsonSerializer.Deserialize<PresentationLibrary>(File.ReadAllText(path), ShowFiles.Json)
             ?? throw new InvalidDataException("The library file is empty.");
-        if (library.Version != 1 || library.Presentations is null || library.Folders is null ||
+        if (library.Version != 1 || library.Presentations is null || library.Overlays is null || library.Folders is null ||
             library.FolderAssignments is null)
             throw new InvalidDataException("Unsupported library file version.");
+        Overlay.ValidateList(library.Overlays);
         if (library.Presentations.Select(item => item.Id).Distinct().Count() != library.Presentations.Count)
             throw new InvalidDataException("The library contains duplicate presentation IDs.");
         if (library.Folders.Select(item => item.Id).Distinct().Count() != library.Folders.Count ||
@@ -158,6 +190,7 @@ public static class LibraryFiles
 
     public static void Save(string path, PresentationLibrary library)
     {
+        Overlay.ValidateList(library.Overlays);
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var temporary = path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(library, ShowFiles.Json));
