@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -8,6 +9,8 @@ namespace Slides;
 
 public sealed class ServiceItemDialog : Window
 {
+    private sealed record ArrangementChoice(string? Id, string Name);
+
     private readonly ComboBox _section = new()
     {
         ItemsSource = ServiceItemDetails.Sections,
@@ -15,6 +18,11 @@ public sealed class ServiceItemDialog : Window
         Foreground = Brushes.Black
     };
     private readonly TextBox _minutes = new() { Margin = new Thickness(0, 6, 0, 14) };
+    private readonly ComboBox _arrangement = new()
+    {
+        DisplayMemberPath = "Name", Background = Brushes.White, Foreground = Brushes.Black,
+        Margin = new Thickness(0, 6, 0, 14)
+    };
     private readonly TextBox _notes = new()
     {
         Height = 110,
@@ -27,8 +35,9 @@ public sealed class ServiceItemDialog : Window
     public string Section => _section.SelectedItem as string ?? "Service";
     public string Notes => _notes.Text.Trim();
     public int? PlannedMinutes { get; private set; }
+    public string? ArrangementId => (_arrangement.SelectedItem as ArrangementChoice)?.Id;
 
-    public ServiceItemDialog(ServiceItemDetails details)
+    public ServiceItemDialog(ServiceItemDetails details, Presentation presentation)
     {
         Title = "Plan service item";
         Width = 420;
@@ -52,6 +61,15 @@ public sealed class ServiceItemDialog : Window
         var content = new StackPanel { Margin = new Thickness(18) };
         content.Children.Add(new TextBlock { Text = "Section", Margin = new Thickness(0, 0, 0, 6) });
         content.Children.Add(_section);
+        if (presentation.Kind == "song" && presentation.Arrangements.Count > 0)
+        {
+            var choices = new[] { new ArrangementChoice(null, "Song order") }
+                .Concat(presentation.Arrangements.Select(item => new ArrangementChoice(item.Id, item.Name))).ToArray();
+            _arrangement.ItemsSource = choices;
+            _arrangement.SelectedItem = choices.FirstOrDefault(item => item.Id == details.ArrangementId) ?? choices[0];
+            content.Children.Add(new TextBlock { Text = "Song arrangement", Margin = new Thickness(0, 14, 0, 0) });
+            content.Children.Add(_arrangement);
+        }
         content.Children.Add(new TextBlock { Text = "Planned minutes (optional)", Margin = new Thickness(0, 14, 0, 0) });
         content.Children.Add(_minutes);
         content.Children.Add(new TextBlock { Text = "Operator notes (up to 2,000 characters)" });

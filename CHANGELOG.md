@@ -4,6 +4,7 @@
 
 ### Added
 
+- Windows song arrangements: reorder or repeat section blocks without copying slides, choose a different arrangement for each service occurrence, and carry that order through the slide grid, navigation, stage cues, and saved shows.
 - Windows visual PowerPoint import renders complete slides through installed Microsoft PowerPoint, preserving the deck’s appearance as offline images that can be packed into a portable show; the earlier object importer remains available as **PPTX Editable**.
 - Windows `.pptx` import for ordered slides, text, basic solid fills and geometry, and embedded images cached locally for offline use and portable show packaging.
 - PowerPoint positioned objects retain basic rotation and flips, with safe font and object-name fallbacks.

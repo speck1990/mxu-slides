@@ -37,6 +37,8 @@ public static class PresentationArrangements
     {
         if (presentation.Kind != "song")
             throw new ArgumentException("Arrangements are available for songs.");
+        if (presentation.Slides.Count == 0)
+            throw new ArgumentException("Add a song section before creating an arrangement.");
         var arrangement = new SlideArrangement
         {
             Name = ValidName(name),
