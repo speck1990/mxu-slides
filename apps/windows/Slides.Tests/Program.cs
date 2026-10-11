@@ -99,7 +99,7 @@ var cases = new (string Name, Action Run)[]
             show.ServiceDetails[1].Notes == "Repeat softly" &&
             show.ServiceDetails[1].PlannedMinutes == 3, "new occurrence has copied plan and new ID");
         show.UpdateServiceItem(1, "Service", "Changed", 4);
-        Check(show.ServiceDetails[0].Notes == "Repeat softly", "editing duplicate does not change source");
+        Check(show.ServiceDetails![0].Notes == "Repeat softly", "editing duplicate does not change source");
     }),
     ("overlays stay in the library and portable show", () =>
     {
