@@ -10,9 +10,11 @@ namespace Slides;
 public sealed class ProjectionWindow : Window
 {
     private readonly SlideSurface _surface = new() { Width = 960, Height = 540 };
+    public string DisplayDeviceName { get; }
 
     public ProjectionWindow(Forms.Screen display)
     {
+        DisplayDeviceName = display.DeviceName;
         Title = "Slides Audience";
         Content = new Viewbox { Child = _surface, Stretch = Stretch.Uniform };
         Background = System.Windows.Media.Brushes.Black;

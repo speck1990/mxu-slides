@@ -117,6 +117,22 @@ var cases = new (string Name, Action Run)[]
         }
         finally { Directory.Delete(folder, true); }
     }),
+    ("stage cue shows current, next, and notes across service items", () =>
+    {
+        var song = SongParser.Parse("Song", "[Verse 1]\nFirst\n\n[Chorus]\nSecond");
+        var empty = new Presentation { Name = "Empty" };
+        var show = new Show { Presentations = [song, empty], ServiceItems = [song.Id, empty.Id, song.Id] };
+        show.EnsureServiceItems();
+        show.UpdateServiceItem(0, "Service", "Sing softly", 4);
+        var first = StageCue.For(show, 0, 0);
+        Check(first.CurrentText == "First" && first.NextText == "Second" &&
+            first.OperatorNotes == "Sing softly" && first.PlannedMinutes == 4,
+            "current verse, next verse, and notes");
+        var boundary = StageCue.For(show, 0, 1);
+        Check(boundary.NextHeading.StartsWith("Song") && boundary.NextText == "First",
+            "next cue skips an empty service item and reaches a repeated song");
+        Check(StageCue.For(show, 2, 1).NextHeading == "End of service", "last cue ends service");
+    }),
     ("live service timing follows occurrences and survives pause and reorder", () =>
     {
         var clock = new ManualClock();

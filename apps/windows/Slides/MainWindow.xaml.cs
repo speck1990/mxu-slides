@@ -62,6 +62,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _videoDisplayTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
     private PresentationLibrary _library = new();
     private ProjectionWindow? _projection;
+    private StageWindow? _stage;
     private bool _black;
     private bool _ready;
     private bool _updatingDate;
@@ -77,9 +78,15 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        StageDisplaySelector.Items.Add("Windowed preview");
         foreach (var screen in Forms.Screen.AllScreens)
+        {
             DisplaySelector.Items.Add($"{screen.DeviceName} ({screen.Bounds.Width} × {screen.Bounds.Height})"
                 + (screen.Primary ? " Primary" : ""));
+            StageDisplaySelector.Items.Add($"{screen.DeviceName} ({screen.Bounds.Width} × {screen.Bounds.Height})"
+                + (screen.Primary ? " Primary" : ""));
+        }
+        StageDisplaySelector.SelectedIndex = 0;
         var secondary = Array.FindIndex(Forms.Screen.AllScreens, screen => !screen.Primary);
         DisplaySelector.SelectedIndex = secondary >= 0 ? secondary : 0;
         try
@@ -522,8 +529,13 @@ public partial class MainWindow : Window
             _projection?.PauseVideo();
         }
         RefreshVideoTransport();
+        UpdateStage();
         Status.Text = slide is null ? "No slide selected" : $"Slide {Slides.SelectedIndex + 1} of {Slides.Items.Count}";
     }
+
+    private void UpdateStage() => _stage?.Update(
+        StageCue.For(_show, SelectedServiceIndex, Slides.SelectedIndex),
+        _run.ServiceElapsed, _run.CurrentItemElapsed);
 
     private void ToggleVideo(object sender, RoutedEventArgs e)
     {
@@ -641,6 +653,11 @@ public partial class MainWindow : Window
         var screens = Forms.Screen.AllScreens;
         if (screens.Length == 0) { MessageBox.Show("No display detected."); return; }
         var index = Math.Clamp(DisplaySelector.SelectedIndex, 0, screens.Length - 1);
+        if (_stage?.DisplayDeviceName == screens[index].DeviceName)
+        {
+            MessageBox.Show(this, "The stage display is using that screen. Choose another audience display or close the stage display.", "Slides");
+            return;
+        }
         _projection = new ProjectionWindow(screens[index]);
         _projection.Closed += (_, _) =>
         {
@@ -652,6 +669,29 @@ public partial class MainWindow : Window
         ProjectButton.Content = "Stop Projection  (F5)";
         Render();
         Activate();
+    }
+
+    private void ToggleStage(object sender, RoutedEventArgs e)
+    {
+        if (_stage is not null) { _stage.Close(); return; }
+        var index = StageDisplaySelector.SelectedIndex - 1;
+        var screens = Forms.Screen.AllScreens;
+        if (index >= screens.Length) return;
+        var display = index >= 0 ? screens[index] : null;
+        if (display is not null && _projection?.DisplayDeviceName == display.DeviceName)
+        {
+            MessageBox.Show(this, "Audience projection is using that screen. Choose another stage display or use Windowed preview.", "Slides");
+            return;
+        }
+        _stage = new StageWindow(display);
+        _stage.Closed += (_, _) =>
+        {
+            _stage = null;
+            StageButton.Content = "Open Stage Display";
+        };
+        _stage.Show();
+        StageButton.Content = "Close Stage Display";
+        UpdateStage();
     }
 
     private void ToggleBlack(object sender, RoutedEventArgs e)
@@ -720,6 +760,7 @@ public partial class MainWindow : Window
             : "";
         var note = row?.Details.Notes;
         OperatorNote.Text = string.IsNullOrEmpty(note) ? "" : "Operator notes: " + note;
+        UpdateStage();
     }
 
     private static string FormatTime(TimeSpan time) =>
@@ -743,6 +784,7 @@ public partial class MainWindow : Window
         _runDisplayTimer.Stop();
         _videoDisplayTimer.Stop();
         _projection?.Close();
+        _stage?.Close();
     }
 
     private void Try(Action operation)
