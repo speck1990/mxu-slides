@@ -205,6 +205,28 @@ var cases = new (string Name, Action Run)[]
         output.Reset();
         Check(!output.SlidesCleared, "opening a show resets the output state");
     }),
+    ("operator countdown pauses, resumes, completes, and resets", () =>
+    {
+        var clock = new ManualClock();
+        var timer = new CountdownTimer(clock);
+        timer.SetDuration(TimeSpan.FromMinutes(2));
+        timer.Start();
+        clock.Advance(TimeSpan.FromSeconds(45));
+        timer.Pause();
+        clock.Advance(TimeSpan.FromMinutes(1));
+        Check(timer.Remaining == TimeSpan.FromSeconds(75) && !timer.IsComplete,
+            "pause preserves remaining time");
+        timer.Start();
+        clock.Advance(TimeSpan.FromSeconds(80));
+        Check(timer.IsComplete && timer.Remaining == TimeSpan.Zero, "timer completes at zero");
+        timer.Pause();
+        timer.Start();
+        Check(timer.Remaining == TimeSpan.FromMinutes(2), "starting a completed timer restarts it");
+        timer.Reset();
+        Check(!timer.IsRunning && timer.Remaining == TimeSpan.FromMinutes(2), "reset restores duration");
+        try { timer.SetDuration(TimeSpan.Zero); throw new Exception("FAIL zero duration accepted"); }
+        catch (ArgumentOutOfRangeException) { }
+    }),
     ("live service timing follows occurrences and survives pause and reorder", () =>
     {
         var clock = new ManualClock();

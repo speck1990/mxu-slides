@@ -240,6 +240,14 @@
           <TextBlock x:Name="ItemRunStatus" Margin="0,5,0,0" />
           <TextBlock x:Name="RemainingStatus" Margin="0,5,0,0" Foreground="#32C55C" />
           <TextBlock x:Name="OperatorNote" Margin="0,12,0,0" Foreground="{StaticResource Muted}" TextWrapping="Wrap" />
+          <TextBlock Text="COUNTDOWN TIMER" Foreground="{StaticResource Muted}" FontSize="11" FontWeight="SemiBold" Margin="0,18,0,7" />
+          <WrapPanel>
+            <TextBox x:Name="CountdownMinutes" Text="5" Width="48" ToolTip="Minutes, from 1 to 480" />
+            <Button Content="Set" Click="SetCountdown" Margin="6,0,0,0" />
+            <Button x:Name="CountdownButton" Content="Start" Click="ToggleCountdown" />
+            <Button Content="Reset" Click="ResetCountdown" />
+          </WrapPanel>
+          <TextBlock x:Name="CountdownStatus" Margin="0,8,0,0" FontFamily="Consolas" FontSize="16" />
           <TextBlock Text="OVERLAYS" Foreground="{StaticResource Muted}" FontSize="11" FontWeight="SemiBold" Margin="0,18,0,7" />
           <ListBox x:Name="OverlaysList" Height="110" ItemContainerStyle="{StaticResource SidebarItem}"
                    DisplayMemberPath="Name" MouseDoubleClick="OnOverlayDoubleClick" />
