@@ -136,6 +136,7 @@
           <Button Content="New Deck" Click="AddDeck" />
           <Button Content="Add Media" Click="AddMedia" />
           <Button Content="Import MxU" Click="ImportMxu" />
+          <Button Content="Import PPTX" Click="ImportPowerPoint" ToolTip="Import PowerPoint text, solid colors, and embedded images" />
           <Button Content="Edit" Click="EditLibraryItem" />
           <Button Content="Duplicate" Click="DuplicateLibraryItem" />
           <Button Content="Delete" Click="DeleteLibraryItem" />

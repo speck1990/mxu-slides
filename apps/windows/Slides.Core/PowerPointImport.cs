@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -15,7 +16,7 @@ public static class PowerPointImport
     private static readonly XNamespace PackageR = "http://schemas.openxmlformats.org/package/2006/relationships";
     private const long MaximumXmlBytes = 16L * 1024 * 1024;
 
-    public static PowerPointImportResult Load(string path)
+    public static PowerPointImportResult Load(string path, string? mediaCacheRoot = null)
     {
         using var archive = ZipFile.OpenRead(path);
         if (archive.Entries.Count > 2000 || archive.Entries.Sum(entry => entry.Length) > 512L * 1024 * 1024)
@@ -26,6 +27,8 @@ public static class PowerPointImport
         var slideWidth = Positive(size.Attribute("cx"));
         var slideHeight = Positive(size.Attribute("cy"));
         var relationships = Relationships(archive, "ppt/_rels/presentation.xml.rels");
+        mediaCacheRoot ??= Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Slides", "imports");
         var presentation = new Presentation
         {
             Name = Path.GetFileNameWithoutExtension(path),
@@ -50,6 +53,7 @@ public static class PowerPointImport
             };
             var elements = new List<SlideElement>();
             var summary = new List<string>();
+            Dictionary<string, string>? slideRelationships = null;
             foreach (var child in source.Root?.Element(P + "cSld")?.Element(P + "spTree")?.Elements()
                          ?? Enumerable.Empty<XElement>())
             {
@@ -62,11 +66,12 @@ public static class PowerPointImport
                     var fill = Color(child.Element(P + "spPr"));
                     var shape = (string?)child.Element(P + "spPr")?.Element(A + "prstGeom")?.Attribute("prst");
                     var name = (string?)child.Element(P + "nvSpPr")?.Element(P + "cNvPr")?.Attribute("name") ?? "Object";
-                    if (fill is not null && shape is ("rect" or "roundRect" or "ellipse") && geometry is { } box)
+                    if (fill is not null && shape is ("rect" or "roundRect" or "ellipse") && geometry is { } shapeBox)
                         elements.Add(new SlideElement
                         {
                             Kind = "shape", Name = name, ShapeKind = shape == "ellipse" ? "ellipse" : "rectangle",
-                            FillColorHex = fill, X = box.X, Y = box.Y, Width = box.Width, Height = box.Height
+                            FillColorHex = fill, X = shapeBox.X, Y = shapeBox.Y,
+                            Width = shapeBox.Width, Height = shapeBox.Height
                         });
                     if (text.Length > 0)
                     {
@@ -81,6 +86,26 @@ public static class PowerPointImport
                         if (geometry is null) skipped++;
                     }
                     else if (fill is not null && geometry is null) skipped++;
+                }
+                else if (child.Name == P + "pic")
+                {
+                    var box = Geometry(child.Element(P + "spPr"), slideWidth, slideHeight);
+                    var embed = (string?)child.Element(P + "blipFill")?.Element(A + "blip")?.Attribute(R + "embed");
+                    if (box is null || embed is null) { skipped++; continue; }
+                    slideRelationships ??= Relationships(archive, RelationshipPart(slidePath));
+                    if (!slideRelationships.TryGetValue(embed, out var imageTarget)) { skipped++; continue; }
+                    var imagePath = Resolve(slidePath, imageTarget);
+                    var extension = Path.GetExtension(imagePath).ToLowerInvariant();
+                    if (extension is not (".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif"))
+                    { skipped++; continue; }
+                    var localPath = CacheImage(archive, imagePath, mediaCacheRoot);
+                    var name = (string?)child.Element(P + "nvPicPr")?.Element(P + "cNvPr")?.Attribute("name")
+                        ?? Path.GetFileNameWithoutExtension(imagePath);
+                    elements.Add(new SlideElement
+                    {
+                        Kind = "image", Name = name, MediaPath = localPath,
+                        X = box.Value.X, Y = box.Value.Y, Width = box.Value.Width, Height = box.Value.Height
+                    });
                 }
                 else if (child.Name != P + "nvGrpSpPr" && child.Name != P + "grpSpPr")
                     skipped++;
@@ -117,6 +142,45 @@ public static class PowerPointImport
                 item => (string?)item.Attribute("Target")
                     ?? throw new InvalidDataException("A PowerPoint relationship has no target."))
         ?? throw new InvalidDataException("The PowerPoint relationship list is missing.");
+
+    private static string RelationshipPart(string partPath)
+    {
+        var slash = partPath.LastIndexOf('/');
+        return partPath[..(slash + 1)] + "_rels/" + partPath[(slash + 1)..] + ".rels";
+    }
+
+    private static string CacheImage(ZipArchive archive, string entryPath, string cacheRoot)
+    {
+        var matches = archive.Entries.Where(entry => entry.FullName == entryPath).Take(2).ToArray();
+        if (matches.Length != 1 || matches[0].Length > 64L * 1024 * 1024)
+            throw new InvalidDataException("An embedded PowerPoint image is missing or too large.");
+        using var data = new MemoryStream();
+        using (var input = matches[0].Open())
+        {
+            var buffer = new byte[64 * 1024];
+            int count;
+            while ((count = input.Read(buffer)) > 0)
+            {
+                if (count > 64L * 1024 * 1024 - data.Length)
+                    throw new InvalidDataException("An embedded PowerPoint image is too large.");
+                data.Write(buffer, 0, count);
+            }
+        }
+        var extension = Path.GetExtension(entryPath).ToLowerInvariant();
+        var hash = Convert.ToHexString(SHA256.HashData(data.GetBuffer().AsSpan(0, (int)data.Length))).ToLowerInvariant();
+        var destination = Path.Combine(cacheRoot, hash + extension);
+        if (File.Exists(destination)) return destination;
+        Directory.CreateDirectory(cacheRoot);
+        var temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            using (var output = File.Create(temporary))
+                data.WriteTo(output);
+            File.Move(temporary, destination, true);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+        return destination;
+    }
 
     public static string Resolve(string source, string target)
     {

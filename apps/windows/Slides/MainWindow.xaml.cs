@@ -56,6 +56,9 @@ public partial class MainWindow : Window
     private readonly string _packageCachePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Slides", "packages");
+    private readonly string _importCachePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Slides", "imports");
     private Show _show = new() { ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
     private readonly ServiceRun _run = new();
     private readonly CountdownTimer _countdown = new();
@@ -491,6 +494,25 @@ public partial class MainWindow : Window
         var picker = new OpenFileDialog { Title = "Import MxU Presentation JSON", Filter = "JSON|*.json" };
         if (picker.ShowDialog(this) != true) return;
         Try(() => AddNewPresentation(MxuPresentationImport.Load(picker.FileName)));
+    }
+
+    private void ImportPowerPoint(object sender, RoutedEventArgs e)
+    {
+        var picker = new OpenFileDialog
+        {
+            Title = "Import PowerPoint deck",
+            Filter = "PowerPoint presentations|*.pptx"
+        };
+        if (picker.ShowDialog(this) != true) return;
+        Try(() =>
+        {
+            var result = PowerPointImport.Load(picker.FileName, _importCachePath);
+            AddNewPresentation(result.Presentation);
+            MessageBox.Show(this, result.SkippedObjects == 0
+                ? "PowerPoint deck imported. Check its slides before presenting; animations, video, and theme effects are not imported."
+                : $"PowerPoint deck imported with {result.SkippedObjects} objects or layouts approximated or skipped. Check every slide before presenting; animations, video, and theme effects are not imported.",
+                "Slides");
+        });
     }
 
     private void OpenShow(object sender, RoutedEventArgs e)

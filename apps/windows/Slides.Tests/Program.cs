@@ -761,6 +761,7 @@ var cases = new (string Name, Action Run)[]
     ("PowerPoint text import follows slide relationships and geometry", () =>
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pptx");
+        var cache = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
         try
         {
             using (var archive = ZipFile.Open(path, ZipArchiveMode.Create))
@@ -793,14 +794,37 @@ var cases = new (string Name, Action Run)[]
                     </p:sld>
                     """);
                 Write("ppt/slides/slide2.xml", """
-                    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
-                      <p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>First in show</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>
+                    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                      <p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>First in show</a:t></a:r></a:p></p:txBody></p:sp>
+                        <p:pic><p:nvPicPr><p:cNvPr name="Picture"/></p:nvPicPr><p:blipFill><a:blip r:embed="img1"/></p:blipFill>
+                          <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9600000" cy="5400000"/></a:xfrm></p:spPr>
+                        </p:pic></p:spTree></p:cSld>
                     </p:sld>
                     """);
+                Write("ppt/slides/_rels/slide2.xml.rels", """
+                    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                      <Relationship Id="img1" Target="../media/image1.png"/>
+                    </Relationships>
+                    """);
+                using var image = archive.CreateEntry("ppt/media/image1.png").Open();
+                image.Write([1, 2, 3, 4]);
             }
-            var imported = PowerPointImport.Load(path);
+            var imported = PowerPointImport.Load(path, cache);
             Check(imported.Presentation.Slides.Select(slide => slide.Text)
                 .SequenceEqual(["First in show", "Hello"]), "slide order follows presentation relationships");
+            var imageElement = imported.Presentation.Slides[0].Elements!.Single(item => item.Kind == "image");
+            Check(imageElement.Name == "Picture" && imageElement.Width == 960 &&
+                File.ReadAllBytes(imageElement.MediaPath!).SequenceEqual([1, 2, 3, 4]),
+                "embedded image is cached and positioned");
+            var package = Path.Combine(cache, "imported.slidespack");
+            ShowPackage.Save(package, new Show
+            {
+                Presentations = [imported.Presentation], ServiceItems = [imported.Presentation.Id]
+            });
+            var portable = ShowPackage.Open(package, Path.Combine(cache, "portable"));
+            Check(File.Exists(portable.Presentations[0].Slides[0].Elements!
+                .Single(item => item.Kind == "image").MediaPath),
+                "imported image survives a portable show");
             var slide = imported.Presentation.Slides[1];
             Check(slide.Background == "#123456FF" && slide.Elements![0].X == 100 &&
                 slide.Elements[0].Y == 50 && slide.Elements[0].Width == 400 &&
@@ -810,7 +834,11 @@ var cases = new (string Name, Action Run)[]
             try { PowerPointImport.Resolve("ppt/slides/slide1.xml", "../../../outside"); throw new Exception("FAIL unsafe target"); }
             catch (InvalidDataException) { }
         }
-        finally { File.Delete(path); }
+        finally
+        {
+            File.Delete(path);
+            if (Directory.Exists(cache)) Directory.Delete(cache, true);
+        }
     }),
     ("MxU positioned text and shapes use the Mac canvas geometry", () =>
     {
