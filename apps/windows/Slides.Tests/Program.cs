@@ -271,6 +271,42 @@ var cases = new (string Name, Action Run)[]
         }
         finally { File.Delete(path); }
     }),
+    ("positioned images keep their fit mode and reject missing files", () =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        try
+        {
+            Directory.CreateDirectory(folder);
+            var path = Path.Combine(folder, "photo.png");
+            File.WriteAllBytes(path, [1, 2, 3]);
+            var items = new List<SlideElement>();
+            var image = SlideLayout.AddImage(items, path);
+            image.MediaScaleMode = "fill";
+            SlideLayout.Resize(image, -120, 40);
+            SlideLayout.AddText(items).Text = "Original lyric";
+            var slide = new Slide();
+            SlideLayout.Apply(slide, items);
+            Check(slide.Elements?[0].Kind == "image" && slide.Elements[0].MediaPath == path &&
+                slide.Elements[0].MediaScaleMode == "fill" && slide.Elements[0].Width == 360,
+                "positioned image and fit mode copy into a slide");
+            var library = new PresentationLibrary();
+            var deck = new Presentation { Slides = [slide] };
+            library.Upsert(deck);
+            var show = new Show { ServiceItems = [] };
+            library.AddToShow(show, deck.Id);
+            Check(show.Presentations[0].Slides[0].Elements?[0].MediaPath == path,
+                "image object survives library to show copy");
+            var editedSong = SongParser.Parse("Song", "Verse 1\nUpdated lyric");
+            PresentationEditing.PreserveSongDesign(deck, editedSong);
+            Check(editedSong.Slides[0].Elements?[0].MediaPath == path &&
+                editedSong.Slides[0].Elements?[1].Text == "Updated lyric",
+                "quick lyric edit keeps the image and refreshes positioned text");
+            File.Delete(path);
+            try { SlideLayout.Validate(slide.Elements!); throw new Exception("FAIL missing image accepted"); }
+            catch (ArgumentException) { }
+        }
+        finally { if (Directory.Exists(folder)) Directory.Delete(folder, true); }
+    }),
     ("folders organize the library without changing show snapshots", () =>
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
@@ -312,20 +348,24 @@ var cases = new (string Name, Action Run)[]
             Directory.CreateDirectory(media);
             Directory.CreateDirectory(other);
             var unique = Path.Combine(media, "screen.png");
+            var inset = Path.Combine(media, "inset.png");
             File.WriteAllText(unique, "image");
+            File.WriteAllText(inset, "inset");
             File.WriteAllText(Path.Combine(media, "duplicate.png"), "first");
             File.WriteAllText(Path.Combine(other, "duplicate.png"), "second");
             var oldRoot = Path.Combine(folder, "old");
             var presentation = new Presentation { Slides =
             [
-                new Slide { MediaPath = Path.Combine(oldRoot, "screen.png") },
+                new Slide { MediaPath = Path.Combine(oldRoot, "screen.png"), Elements =
+                    [new SlideElement { Kind = "image", MediaPath = Path.Combine(oldRoot, "inset.png") }] },
                 new Slide { MediaPath = Path.Combine(oldRoot, "duplicate.png") },
                 new Slide { MediaPath = Path.Combine(oldRoot, "missing.png") },
                 new Slide { MediaPath = unique }
             ] };
             var result = MediaRelinker.Relink([presentation], folder);
-            Check(result == new MediaRelinkResult(1, 1, 1), "relink counts");
+            Check(result == new MediaRelinkResult(2, 1, 1), "relink counts include positioned images");
             Check(presentation.Slides[0].MediaPath == unique, "unique file relinked");
+            Check(presentation.Slides[0].Elements![0].MediaPath == inset, "positioned image relinked");
             Check(presentation.Slides[1].MediaPath == Path.Combine(oldRoot, "duplicate.png"),
                 "ambiguous file remains unchanged");
             Check(presentation.Slides[3].MediaPath == unique, "working file remains unchanged");
@@ -340,13 +380,17 @@ var cases = new (string Name, Action Run)[]
             Directory.CreateDirectory(folder);
             var image = Path.Combine(folder, "background.png");
             var video = Path.Combine(folder, "motion.mp4");
+            var inset = Path.Combine(folder, "inset.png");
             var package = Path.Combine(folder, "service.slidespack");
             File.WriteAllBytes(image, [1, 2, 3, 4]);
             File.WriteAllBytes(video, [5, 6, 7]);
+            File.WriteAllBytes(inset, [8, 9, 10]);
             var presentation = new Presentation { Name = "Media", Slides =
             [
                 new Slide { Name = "Image", MediaPath = image, Elements =
-                    [new SlideElement { Name = "Title", Text = "Welcome", X = 120, Y = 80, Width = 500, Height = 160 }] },
+                    [new SlideElement { Name = "Title", Text = "Welcome", X = 120, Y = 80, Width = 500, Height = 160 },
+                     new SlideElement { Kind = "image", Name = "Inset", MediaPath = inset, MediaScaleMode = "fill",
+                         X = 500, Y = 260, Width = 300, Height = 200 }] },
                 new Slide { Name = "Video", MediaPath = video },
                 new Slide { Name = "Image again", MediaPath = image }
             ] };
@@ -355,13 +399,16 @@ var cases = new (string Name, Action Run)[]
             Check(show.Presentations[0].Slides[0].MediaPath == image, "packing does not change the open show");
             using (var archive = ZipFile.OpenRead(package))
             {
-                Check(archive.Entries.Count(entry => entry.FullName.StartsWith("media/")) == 2,
+                Check(archive.Entries.Count(entry => entry.FullName.StartsWith("media/")) == 3,
                     "reused media is packed once");
                 using var reader = new StreamReader(archive.GetEntry("show.json")!.Open());
-                Check(!reader.ReadToEnd().Contains(image, StringComparison.Ordinal), "package omits original absolute paths");
+                var packedJson = reader.ReadToEnd();
+                Check(!packedJson.Contains(image, StringComparison.Ordinal) &&
+                    !packedJson.Contains(inset, StringComparison.Ordinal), "package omits original absolute paths");
             }
             File.Delete(image);
             File.Delete(video);
+            File.Delete(inset);
             var opened = ShowPackage.Open(package, Path.Combine(folder, "cache"));
             Check(opened.ServiceItems!.SequenceEqual([presentation.Id, presentation.Id]), "service order survives packaging");
             Check(File.ReadAllBytes(opened.Presentations[0].Slides[0].MediaPath!).SequenceEqual(new byte[] { 1, 2, 3, 4 }),
@@ -373,12 +420,17 @@ var cases = new (string Name, Action Run)[]
             Check(opened.Presentations[0].Slides[0].Elements?[0].Text == "Welcome" &&
                 opened.Presentations[0].Slides[0].Elements?[0].X == 120,
                 "positioned layout survives portable packaging");
+            var openedInset = opened.Presentations[0].Slides[0].Elements![1];
+            Check(File.ReadAllBytes(openedInset.MediaPath!).SequenceEqual(new byte[] { 8, 9, 10 }) &&
+                openedInset.MediaScaleMode == "fill", "positioned image survives without its original file");
             var library = new PresentationLibrary();
             library.ImportMissing(show.Presentations);
             library.Presentations[0].Name = "My edited library title";
             Check(library.RepairMissingMediaFrom(opened.Presentations), "package repairs stale library media paths");
             Check(library.Presentations[0].Slides[0].MediaPath == opened.Presentations[0].Slides[0].MediaPath &&
                 library.Presentations[0].Name == "My edited library title", "repair preserves library edits");
+            Check(library.Presentations[0].Slides[0].Elements![1].MediaPath == openedInset.MediaPath,
+                "package repairs positioned image in the library");
             Check(ShowPackage.Open(package, Path.Combine(folder, "cache")).Presentations[0].Slides[0].MediaPath ==
                 opened.Presentations[0].Slides[0].MediaPath, "reopening uses the same verified cache");
         }
@@ -396,6 +448,11 @@ var cases = new (string Name, Action Run)[]
             try { ShowPackage.Save(package, show); throw new Exception("FAIL missing media packed"); }
             catch (FileNotFoundException) { }
             Check(!File.Exists(package), "failed package does not replace a show");
+            show.Presentations[0].Slides[0].MediaPath = null;
+            show.Presentations[0].Slides[0].Elements = [new SlideElement { Kind = "image", Name = "Missing image" }];
+            try { ShowPackage.Save(package, show); throw new Exception("FAIL empty image reference packed"); }
+            catch (FileNotFoundException) { }
+            Check(!File.Exists(package), "missing positioned image does not create a package");
 
             using (var archive = ZipFile.Open(package, ZipArchiveMode.Create))
             {
@@ -407,6 +464,18 @@ var cases = new (string Name, Action Run)[]
             try { ShowPackage.Open(package, Path.Combine(folder, "cache")); throw new Exception("FAIL unsafe path accepted"); }
             catch (InvalidDataException) { }
             Check(!Directory.Exists(Path.Combine(folder, "cache")), "unsafe archive extracts nothing");
+
+            File.Delete(package);
+            using (var archive = ZipFile.Open(package, ZipArchiveMode.Create))
+            {
+                using (var writer = new StreamWriter(archive.CreateEntry("format.txt").Open()))
+                    writer.Write("Slides portable show 1\n");
+                using (var writer = new StreamWriter(archive.CreateEntry("show.json").Open()))
+                    writer.Write("""{"version":1,"presentations":[{"slides":[{"elements":[{"kind":"image","mediaPath":"../../escape.png"}]}]}]}""");
+            }
+            try { ShowPackage.Open(package, Path.Combine(folder, "cache")); throw new Exception("FAIL unsafe positioned image accepted"); }
+            catch (InvalidDataException) { }
+            Check(!Directory.Exists(Path.Combine(folder, "cache")), "unsafe positioned image extracts nothing");
 
             File.Delete(package);
             var badMedia = "media/" + new string('0', 64) + ".png";

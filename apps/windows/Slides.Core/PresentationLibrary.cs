@@ -86,16 +86,28 @@ public sealed class PresentationLibrary
             var slides = target.Slides.ToDictionary(slide => slide.Id);
             foreach (var sourceSlide in source.Slides)
             {
-                if (!slides.TryGetValue(sourceSlide.Id, out var targetSlide) ||
-                    string.IsNullOrWhiteSpace(sourceSlide.MediaPath) || !File.Exists(sourceSlide.MediaPath) ||
-                    !string.IsNullOrWhiteSpace(targetSlide.MediaPath) && File.Exists(targetSlide.MediaPath))
-                    continue;
-                targetSlide.MediaPath = sourceSlide.MediaPath;
-                changed = true;
+                if (!slides.TryGetValue(sourceSlide.Id, out var targetSlide)) continue;
+                if (CanRepair(sourceSlide.MediaPath, targetSlide.MediaPath))
+                {
+                    targetSlide.MediaPath = sourceSlide.MediaPath;
+                    changed = true;
+                }
+                if (sourceSlide.Elements is null || targetSlide.Elements is null) continue;
+                foreach (var sourceElement in sourceSlide.Elements.Where(item => item.Kind == "image"))
+                {
+                    var targetElement = targetSlide.Elements.FirstOrDefault(item => item.Id == sourceElement.Id && item.Kind == "image");
+                    if (targetElement is null || !CanRepair(sourceElement.MediaPath, targetElement.MediaPath)) continue;
+                    targetElement.MediaPath = sourceElement.MediaPath;
+                    changed = true;
+                }
             }
         }
         return changed;
     }
+
+    private static bool CanRepair(string? source, string? target) =>
+        !string.IsNullOrWhiteSpace(source) && File.Exists(source) &&
+        (string.IsNullOrWhiteSpace(target) || !File.Exists(target));
 
     public void Upsert(Presentation presentation)
     {

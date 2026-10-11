@@ -132,6 +132,21 @@ public sealed class SlideSurface : Grid
                     holder.Children.Add(block);
                     visual = holder;
                 }
+                else if (element.Kind == "image" && element.MediaPath is { Length: > 0 } imagePath && File.Exists(imagePath))
+                {
+                    var holder = new Grid { Width = element.Width, Height = element.Height, ClipToBounds = true };
+                    holder.Children.Add(new Image
+                    {
+                        Source = new BitmapImage(new Uri(Path.GetFullPath(imagePath))),
+                        Stretch = element.MediaScaleMode switch
+                        {
+                            "fill" => Stretch.UniformToFill,
+                            "stretch" => Stretch.Fill,
+                            _ => Stretch.Uniform
+                        }
+                    });
+                    visual = holder;
+                }
                 else continue;
                 Canvas.SetLeft(visual, element.X);
                 Canvas.SetTop(visual, element.Y);

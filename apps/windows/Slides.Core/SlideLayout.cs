@@ -45,6 +45,22 @@ public static partial class SlideLayout
         return element;
     }
 
+    public static SlideElement AddImage(List<SlideElement> elements, string path)
+    {
+        if (!File.Exists(path)) throw new FileNotFoundException("Choose an existing image.", path);
+        if (!IsImage(path)) throw new ArgumentException("Choose a PNG, JPEG, BMP, or GIF image.", nameof(path));
+        var element = new SlideElement
+        {
+            Kind = "image", Name = Path.GetFileNameWithoutExtension(path), MediaPath = Path.GetFullPath(path),
+            X = 240, Y = 135, Width = 480, Height = 270
+        };
+        elements.Add(element);
+        return element;
+    }
+
+    public static bool IsImage(string path) => Path.GetExtension(path).ToLowerInvariant()
+        is ".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif";
+
     public static void Translate(SlideElement element, double dx, double dy)
     {
         if (!double.IsFinite(dx) || !double.IsFinite(dy))
@@ -93,7 +109,7 @@ public static partial class SlideLayout
     {
         foreach (var item in elements)
         {
-            if (item.Kind is not ("text" or "shape"))
+            if (item.Kind is not ("text" or "shape" or "image"))
                 throw new ArgumentException("The layout contains an unsupported object.");
             if (string.IsNullOrWhiteSpace(item.Name))
                 throw new ArgumentException("Name every slide object.");
@@ -106,6 +122,11 @@ public static partial class SlideLayout
                 throw new ArgumentException($"Use #RRGGBB or #RRGGBBAA for {item.Name}'s fill.");
             if (item.Kind == "shape" && item.ShapeKind is not ("rectangle" or "ellipse"))
                 throw new ArgumentException($"Choose a supported shape for {item.Name}.");
+            if (item.Kind == "image" && (string.IsNullOrWhiteSpace(item.MediaPath) ||
+                !IsImage(item.MediaPath) || !File.Exists(item.MediaPath)))
+                throw new ArgumentException($"Image is missing for {item.Name}. Use Relink Media or choose another image.");
+            if (item.Kind == "image" && item.MediaScaleMode is not ("fit" or "fill" or "stretch"))
+                throw new ArgumentException($"Choose fit, fill, or stretch for {item.Name}.");
             if (!double.IsFinite(item.CornerRadius) || item.CornerRadius is < 0 or > 200)
                 throw new ArgumentException($"Enter a corner radius from 0 to 200 for {item.Name}.");
             if (item.TextStyle is { } style)

@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
+using Microsoft.Win32;
 using Slides.Core;
 
 namespace Slides;
@@ -24,6 +26,9 @@ public sealed class SlideLayoutEditor : Window
     private readonly TextBox _height = Field();
     private readonly TextBox _fill = Field();
     private readonly TextBox _corner = Field();
+    private readonly TextBlock _imagePath = Label("");
+    private readonly ComboBox _imageMode = new();
+    private readonly Button _replaceImage;
     private bool _loading;
     private bool _dragging;
 
@@ -76,6 +81,7 @@ public sealed class SlideLayoutEditor : Window
         actions.Children.Add(Button("+ Text", AddText));
         actions.Children.Add(Button("+ Rectangle", AddShape));
         actions.Children.Add(Button("+ Ellipse", AddEllipse));
+        actions.Children.Add(Button("+ Image", AddImage));
         actions.Children.Add(Button("Duplicate", Duplicate));
         actions.Children.Add(Button("Remove", Remove));
         actions.Children.Add(Button("Back", () => Move(-1)));
@@ -123,12 +129,24 @@ public sealed class SlideLayoutEditor : Window
         fields.Children.Add(_fill);
         fields.Children.Add(Label("Corner radius"));
         fields.Children.Add(_corner);
+        fields.Children.Add(Label("Image"));
+        _imagePath.Margin = new Thickness(0, 4, 0, 8);
+        fields.Children.Add(_imagePath);
+        _replaceImage = Button("Replace image", ReplaceImage);
+        fields.Children.Add(_replaceImage);
+        fields.Children.Add(Label("Image scaling"));
+        _imageMode.ItemsSource = new[] { "fit", "fill", "stretch" };
+        _imageMode.Background = Brushes.White;
+        _imageMode.Foreground = Brushes.Black;
+        _imageMode.Margin = new Thickness(0, 4, 0, 12);
+        fields.Children.Add(_imageMode);
         right.Children.Add(new ScrollViewer { Content = fields, VerticalScrollBarVisibility = ScrollBarVisibility.Auto });
         layout.Children.Add(columns);
         Content = layout;
 
         foreach (var field in new[] { _name, _text, _x, _y, _width, _height, _fill, _corner })
             field.TextChanged += (_, _) => UpdateObject();
+        _imageMode.SelectionChanged += (_, _) => UpdateObject();
         _name.LostFocus += (_, _) => RefreshObjectList();
         _objects.SelectedIndex = _elements.Count > 0 ? 0 : -1;
         RefreshPreview();
@@ -174,6 +192,7 @@ public sealed class SlideLayoutEditor : Window
             field.IsEnabled = item is not null;
         _text.IsEnabled = item?.Kind == "text";
         _fill.IsEnabled = _corner.IsEnabled = item?.Kind == "shape";
+        _imagePath.IsEnabled = _imageMode.IsEnabled = _replaceImage.IsEnabled = item?.Kind == "image";
         _name.Text = item?.Name ?? "";
         _text.Text = item?.Text ?? "";
         _x.Text = Number(item?.X);
@@ -182,6 +201,9 @@ public sealed class SlideLayoutEditor : Window
         _height.Text = Number(item?.Height);
         _fill.Text = item?.FillColorHex ?? "";
         _corner.Text = Number(item?.CornerRadius);
+        _imagePath.Text = item?.Kind == "image" ? Path.GetFileName(item.MediaPath) : "No image selected";
+        _imagePath.ToolTip = item?.MediaPath;
+        _imageMode.SelectedItem = item?.MediaScaleMode ?? "fit";
         _loading = false;
         if (!_dragging) RefreshHandles();
     }
@@ -205,6 +227,8 @@ public sealed class SlideLayoutEditor : Window
             item.FillColorHex = _fill.Text;
             item.CornerRadius = Parse(_corner.Text);
         }
+        if (item.Kind == "image" && _imageMode.SelectedItem is string mode)
+            item.MediaScaleMode = mode;
         RefreshPreview();
     }
 
@@ -331,6 +355,41 @@ public sealed class SlideLayoutEditor : Window
         _objects.Items.Refresh();
         _objects.SelectedItem = item;
         RefreshPreview();
+    }
+
+    private void AddImage()
+    {
+        var path = PickImage();
+        if (path is null) return;
+        try
+        {
+            var item = SlideLayout.AddImage(_elements, path);
+            _objects.Items.Refresh();
+            _objects.SelectedItem = item;
+            RefreshPreview();
+        }
+        catch (Exception error) when (error is ArgumentException or FileNotFoundException) { ShowError(error.Message); }
+    }
+
+    private void ReplaceImage()
+    {
+        if (_objects.SelectedItem is not SlideElement { Kind: "image" } item) return;
+        var path = PickImage();
+        if (path is null) return;
+        if (!SlideLayout.IsImage(path)) { ShowError("Choose a PNG, JPEG, BMP, or GIF image."); return; }
+        item.MediaPath = Path.GetFullPath(path);
+        LoadSelected();
+        RefreshPreview();
+    }
+
+    private string? PickImage()
+    {
+        var picker = new OpenFileDialog
+        {
+            Title = "Choose a slide image",
+            Filter = "Images|*.png;*.jpg;*.jpeg;*.bmp;*.gif"
+        };
+        return picker.ShowDialog(this) == true ? picker.FileName : null;
     }
 
     private void Duplicate()

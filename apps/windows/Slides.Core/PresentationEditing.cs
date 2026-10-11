@@ -57,6 +57,21 @@ public static partial class PresentationEditing
             var slide = replacement.Slides[index];
             slide.Background = source.Background;
             slide.TextStyle = source.TextStyle is { } style ? CopyStyle(style) : null;
+            if (source.Elements is { Count: > 0 } elements)
+            {
+                slide.Elements = SlideLayout.Copy(elements);
+                if (slide.Text != source.Text)
+                {
+                    var textObjects = slide.Elements.Where(item => item.Kind == "text").ToArray();
+                    if (textObjects.Length == 0)
+                        SlideLayout.AddText(slide.Elements).Text = slide.Text;
+                    else
+                    {
+                        textObjects[0].Text = slide.Text;
+                        foreach (var extra in textObjects.Skip(1)) extra.Text = "";
+                    }
+                }
+            }
             if (index < original.Slides.Count)
             {
                 slide.Id = source.Id;
