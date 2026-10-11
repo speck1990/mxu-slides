@@ -5,7 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using Slides.Core;
 using Forms = System.Windows.Forms;
@@ -55,6 +57,8 @@ public partial class MainWindow : Window
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Slides", "packages");
     private Show _show = new() { ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
+    private readonly ServiceRun _run = new();
+    private readonly DispatcherTimer _runDisplayTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private PresentationLibrary _library = new();
     private ProjectionWindow? _projection;
     private bool _black;
@@ -82,6 +86,8 @@ public partial class MainWindow : Window
         catch (Exception ex) { MessageBox.Show($"Could not restore Slides data: {ex.Message}"); }
         RefreshFolderChoices();
         RefreshPresentations();
+        _runDisplayTimer.Tick += (_, _) => RefreshRunDisplay();
+        _runDisplayTimer.Start();
         _ready = true;
     }
 
@@ -413,6 +419,8 @@ public partial class MainWindow : Window
             _library.ImportMissing(opened.Presentations);
             _library.RepairMissingMediaFrom(opened.Presentations);
             _show = opened;
+            _run.Reset();
+            _run.Select(null);
             Changed(0);
         });
     }
@@ -439,7 +447,13 @@ public partial class MainWindow : Window
         if (_show.ServiceItems is { Count: > 0 } &&
             MessageBox.Show(this, "Start a new show? Use Save As first if you want to keep this service.",
                 "Slides", MessageBoxButton.YesNo) != MessageBoxResult.Yes) return;
-        Try(() => { _show = new Show { ServiceItems = [], ServiceDate = DateOnly.FromDateTime(DateTime.Today) }; Changed(0); });
+        Try(() =>
+        {
+            _show = new Show { ServiceItems = [], ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
+            _run.Reset();
+            _run.Select(null);
+            Changed(0);
+        });
     }
 
     private void SaveShowAs(object sender, RoutedEventArgs e)
@@ -458,6 +472,8 @@ public partial class MainWindow : Window
 
     private void OnPresentationChanged(object sender, SelectionChangedEventArgs e)
     {
+        _run.Select((Presentations.SelectedItem as ServiceRow)?.Details.Id);
+        RefreshRunDisplay();
         var presentation = SelectedPresentation;
         SelectionTitle.Text = presentation?.Name ?? "Select an item in Service Flow";
         Slides.ItemsSource = presentation?.Slides.Select((slide, index) =>
@@ -505,16 +521,72 @@ public partial class MainWindow : Window
     private void Previous(object sender, RoutedEventArgs e)
     {
         if (Slides.SelectedIndex > 0) Slides.SelectedIndex--;
+        else PreviousItem(sender, e);
     }
 
     private void Next(object sender, RoutedEventArgs e)
     {
         if (Slides.SelectedIndex < Slides.Items.Count - 1) Slides.SelectedIndex++;
+        else NextItem(sender, e);
     }
+
+    private void PreviousItem(object sender, RoutedEventArgs e)
+    {
+        if (Presentations.SelectedIndex <= 0) return;
+        Presentations.SelectedIndex--;
+        if (Slides.Items.Count > 0) Slides.SelectedIndex = Slides.Items.Count - 1;
+    }
+
+    private void NextItem(object sender, RoutedEventArgs e)
+    {
+        if (Presentations.SelectedIndex < 0 || Presentations.SelectedIndex >= Presentations.Items.Count - 1) return;
+        Presentations.SelectedIndex++;
+    }
+
+    private void ToggleRun(object sender, RoutedEventArgs e)
+    {
+        if (_run.IsRunning) _run.Pause();
+        else _run.Start();
+        RefreshRunDisplay();
+    }
+
+    private void ResetRun(object sender, RoutedEventArgs e)
+    {
+        if (_run.ServiceElapsed > TimeSpan.Zero &&
+            MessageBox.Show(this, "Reset the live service timer and all item times?", "Slides",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        _run.Reset();
+        RefreshRunDisplay();
+    }
+
+    private void RefreshRunDisplay()
+    {
+        var row = Presentations.SelectedItem as ServiceRow;
+        var plannedTotal = _show.ServiceDetails?.Sum(item => item.PlannedMinutes ?? 0) ?? 0;
+        RunButton.Content = _run.IsRunning ? "Pause Run" : _run.ServiceElapsed > TimeSpan.Zero ? "Resume Run" : "Start Run";
+        RunButton.IsEnabled = row is not null;
+        RunStatus.Text = $"Service elapsed: {FormatTime(_run.ServiceElapsed)}" +
+            (plannedTotal > 0 ? $" / {plannedTotal} min planned" : "");
+        ItemRunStatus.Text = row is null ? "Select a service item to start." :
+            $"This item: {FormatTime(_run.CurrentItemElapsed)}" +
+            (row.Details.PlannedMinutes is { } minutes ? $" / {minutes} min planned" : "");
+        RemainingStatus.Text = row?.Details.PlannedMinutes is { } planned
+            ? _run.CurrentItemElapsed <= TimeSpan.FromMinutes(planned)
+                ? $"Remaining: {FormatTime(TimeSpan.FromMinutes(planned) - _run.CurrentItemElapsed)}"
+                : $"Over by: {FormatTime(_run.CurrentItemElapsed - TimeSpan.FromMinutes(planned))}"
+            : "";
+        var note = row?.Details.Notes;
+        OperatorNote.Text = string.IsNullOrEmpty(note) ? "" : "Operator notes: " + note;
+    }
+
+    private static string FormatTime(TimeSpan time) =>
+        $"{(int)time.TotalHours:00}:{time.Minutes:00}:{time.Seconds:00}";
 
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.OriginalSource is TextBox) return;
+        if (Keyboard.Modifiers != ModifierKeys.None ||
+            Keyboard.FocusedElement is TextBox or ComboBox or DatePicker ||
+            e.Key == Key.Space && Keyboard.FocusedElement is ButtonBase) return;
         if (e.Key == Key.F5) { ToggleProjection(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.B) { ToggleBlack(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.Right || e.Key == Key.Space)
@@ -523,7 +595,11 @@ public partial class MainWindow : Window
         { Previous(this, new RoutedEventArgs()); e.Handled = true; }
     }
 
-    private void OnClosing(object? sender, CancelEventArgs e) => _projection?.Close();
+    private void OnClosing(object? sender, CancelEventArgs e)
+    {
+        _runDisplayTimer.Stop();
+        _projection?.Close();
+    }
 
     private void Try(Action operation)
     {
