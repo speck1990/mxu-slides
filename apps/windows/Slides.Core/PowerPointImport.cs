@@ -65,13 +65,16 @@ public static class PowerPointImport
                     var geometry = Geometry(child.Element(P + "spPr"), slideWidth, slideHeight);
                     var fill = Color(child.Element(P + "spPr"));
                     var shape = (string?)child.Element(P + "spPr")?.Element(A + "prstGeom")?.Attribute("prst");
-                    var name = (string?)child.Element(P + "nvSpPr")?.Element(P + "cNvPr")?.Attribute("name") ?? "Object";
+                    var name = SafeName((string?)child.Element(P + "nvSpPr")?.Element(P + "cNvPr")?.Attribute("name"), "Object");
+                    var transform = child.Element(P + "spPr")?.Element(A + "xfrm");
                     if (fill is not null && shape is ("rect" or "roundRect" or "ellipse") && geometry is { } shapeBox)
                         elements.Add(new SlideElement
                         {
                             Kind = "shape", Name = name, ShapeKind = shape == "ellipse" ? "ellipse" : "rectangle",
                             FillColorHex = fill, X = shapeBox.X, Y = shapeBox.Y,
-                            Width = shapeBox.Width, Height = shapeBox.Height
+                            Width = shapeBox.Width, Height = shapeBox.Height,
+                            RotationDegrees = Rotation(transform), FlipHorizontal = Flip(transform, "flipH"),
+                            FlipVertical = Flip(transform, "flipV")
                         });
                     if (text.Length > 0)
                     {
@@ -81,7 +84,9 @@ public static class PowerPointImport
                         {
                             Kind = "text", Name = name, Text = text,
                             X = box.X, Y = box.Y, Width = box.Width, Height = box.Height,
-                            TextStyle = TextStyle(child, "#000000FF")
+                            TextStyle = TextStyle(child, "#000000FF"),
+                            RotationDegrees = Rotation(transform), FlipHorizontal = Flip(transform, "flipH"),
+                            FlipVertical = Flip(transform, "flipV")
                         });
                         if (geometry is null) skipped++;
                     }
@@ -99,12 +104,15 @@ public static class PowerPointImport
                     if (extension is not (".png" or ".jpg" or ".jpeg" or ".bmp" or ".gif"))
                     { skipped++; continue; }
                     var localPath = CacheImage(archive, imagePath, mediaCacheRoot);
-                    var name = (string?)child.Element(P + "nvPicPr")?.Element(P + "cNvPr")?.Attribute("name")
-                        ?? Path.GetFileNameWithoutExtension(imagePath);
+                    var name = SafeName((string?)child.Element(P + "nvPicPr")?.Element(P + "cNvPr")?.Attribute("name"),
+                        Path.GetFileNameWithoutExtension(imagePath));
+                    var transform = child.Element(P + "spPr")?.Element(A + "xfrm");
                     elements.Add(new SlideElement
                     {
                         Kind = "image", Name = name, MediaPath = localPath,
-                        X = box.Value.X, Y = box.Value.Y, Width = box.Value.Width, Height = box.Value.Height
+                        X = box.Value.X, Y = box.Value.Y, Width = box.Value.Width, Height = box.Value.Height,
+                        RotationDegrees = Rotation(transform), FlipHorizontal = Flip(transform, "flipH"),
+                        FlipVertical = Flip(transform, "flipV")
                     });
                 }
                 else if (child.Name != P + "nvGrpSpPr" && child.Name != P + "grpSpPr")
@@ -227,6 +235,17 @@ public static class PowerPointImport
         return hex is { Length: 6 } && hex.All(Uri.IsHexDigit) ? "#" + hex.ToUpperInvariant() + "FF" : null;
     }
 
+    private static string SafeName(string? name, string fallback) =>
+        string.IsNullOrWhiteSpace(name) ? string.IsNullOrWhiteSpace(fallback) ? "Object" : fallback
+            : name.Length <= 120 ? name : name[..120];
+
+    private static double Rotation(XElement? transform) =>
+        long.TryParse((string?)transform?.Attribute("rot"), out var value)
+            ? Math.Clamp(value / 60000d, -3600, 3600) : 0;
+
+    private static bool Flip(XElement? transform, string name) =>
+        (string?)transform?.Attribute(name) is "1" or "true";
+
     private static SlideTextStyle TextStyle(XElement shape, string fallbackColor)
     {
         var run = shape.Element(P + "txBody")?.Descendants(A + "rPr").FirstOrDefault();
@@ -234,10 +253,12 @@ public static class PowerPointImport
         var properties = run ?? end;
         var fontSize = double.TryParse((string?)properties?.Attribute("sz"), out var size)
             ? Math.Clamp(size / 100d * 540d / 720d, 12, 120) : 36;
+        var font = (string?)properties?.Element(A + "latin")?.Attribute("typeface");
         return new SlideTextStyle
         {
             FontSize = fontSize,
-            FontName = (string?)properties?.Element(A + "latin")?.Attribute("typeface") ?? "Segoe UI",
+            FontName = string.IsNullOrWhiteSpace(font) || font.Length > 100 || font.StartsWith('+')
+                ? "Segoe UI" : font,
             ColorHex = Color(properties) ?? fallbackColor,
             Weight = (string?)properties?.Attribute("b") == "1" ? "bold" : "normal",
             HorizontalAlignment = (string?)shape.Element(P + "txBody")?.Element(A + "p")

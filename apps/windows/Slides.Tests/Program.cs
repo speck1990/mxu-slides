@@ -787,7 +787,7 @@ var cases = new (string Name, Action Run)[]
                     <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
                       <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="123456"/></a:solidFill></p:bgPr></p:bg>
                         <p:spTree><p:sp><p:nvSpPr><p:cNvPr name="Title"/></p:nvSpPr>
-                          <p:spPr><a:xfrm><a:off x="1000000" y="500000"/><a:ext cx="4000000" cy="1000000"/></a:xfrm></p:spPr>
+                          <p:spPr><a:xfrm rot="5400000" flipH="1"><a:off x="1000000" y="500000"/><a:ext cx="4000000" cy="1000000"/></a:xfrm></p:spPr>
                           <p:txBody><a:p><a:r><a:rPr sz="4000" b="1"><a:solidFill><a:srgbClr val="ABCDEF"/></a:solidFill></a:rPr><a:t>Hello</a:t></a:r></a:p></p:txBody>
                         </p:sp></p:spTree>
                       </p:cSld>
@@ -828,7 +828,9 @@ var cases = new (string Name, Action Run)[]
             var slide = imported.Presentation.Slides[1];
             Check(slide.Background == "#123456FF" && slide.Elements![0].X == 100 &&
                 slide.Elements[0].Y == 50 && slide.Elements[0].Width == 400 &&
-                slide.Elements[0].TextStyle?.ColorHex == "#ABCDEFFF", "solid background and text geometry import");
+                slide.Elements[0].TextStyle?.ColorHex == "#ABCDEFFF" &&
+                slide.Elements[0].RotationDegrees == 90 && slide.Elements[0].FlipHorizontal,
+                "solid background and text geometry import");
             Check(PowerPointImport.Resolve("ppt/slides/slide1.xml", "../media/image.png") == "ppt/media/image.png",
                 "relative media target stays inside package");
             try { PowerPointImport.Resolve("ppt/slides/slide1.xml", "../../../outside"); throw new Exception("FAIL unsafe target"); }
