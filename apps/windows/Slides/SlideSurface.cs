@@ -36,6 +36,8 @@ public sealed class SlideSurface : Grid
     private bool _surfaceReady;
     private bool _renderedAsThumbnail;
     private Slide? _displayedSlide;
+    private Overlay? _displayedOverlay;
+    private FrameworkElement? _overlayVisual;
     private bool _videoPlaying;
     private readonly Border _blackCover = new() { Background = Brushes.Black, Visibility = Visibility.Collapsed };
     public event EventHandler? VideoStateChanged;
@@ -83,9 +85,9 @@ public sealed class SlideSurface : Grid
 
     public SlideSurface() => Show(null, false);
 
-    private void Refresh() => Show(CurrentSlide, _black);
+    private void Refresh() => Show(CurrentSlide, _black, _displayedOverlay);
 
-    public void Show(Slide? slide, bool black)
+    public void Show(Slide? slide, bool black, Overlay? overlay = null)
     {
         _black = black;
         if (!_surfaceReady || !ReferenceEquals(_displayedSlide, slide) || _renderedAsThumbnail != IsThumbnail)
@@ -95,7 +97,35 @@ public sealed class SlideSurface : Grid
             Rebuild(slide);
             _surfaceReady = true;
         }
+        if (!ReferenceEquals(_displayedOverlay, overlay)) UpdateOverlay(overlay);
         _blackCover.Visibility = black ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void UpdateOverlay(Overlay? overlay)
+    {
+        if (_overlayVisual is not null) Children.Remove(_overlayVisual);
+        _displayedOverlay = overlay;
+        _overlayVisual = null;
+        if (overlay is null) return;
+        var text = new TextBlock
+        {
+            Text = overlay.Text, Foreground = Brush(overlay.TextColor),
+            FontFamily = new FontFamily("Segoe UI"), FontWeight = FontWeights.SemiBold,
+            FontSize = overlay.Layout == "fullScreen" ? 56 : 34,
+            TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center,
+            TextAlignment = overlay.Layout == "fullScreen" ? TextAlignment.Center : TextAlignment.Left
+        };
+        var panel = new Border
+        {
+            Child = text, Background = Brush(overlay.BackgroundColor),
+            CornerRadius = overlay.Layout == "fullScreen" ? new CornerRadius(0) : new CornerRadius(8),
+            Padding = overlay.Layout == "fullScreen" ? new Thickness(90, 50, 90, 50) : new Thickness(26, 16, 26, 16),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = overlay.Layout == "fullScreen" ? VerticalAlignment.Stretch : VerticalAlignment.Bottom,
+            Margin = overlay.Layout == "fullScreen" ? new Thickness(0) : new Thickness(48, 0, 48, 32)
+        };
+        _overlayVisual = panel;
+        Children.Insert(Children.Count - 1, panel);
     }
 
     private void Rebuild(Slide? slide)
@@ -104,6 +134,8 @@ public sealed class SlideSurface : Grid
         _video = null;
         _videoPlaying = false;
         Children.Clear();
+        _displayedOverlay = null;
+        _overlayVisual = null;
         Background = Brush(slide?.Background ?? "#0B1220");
         Children.Add(_blackCover);
         if (slide?.MediaPath is { Length: > 0 } path && File.Exists(path))

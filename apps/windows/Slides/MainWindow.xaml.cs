@@ -68,8 +68,10 @@ public partial class MainWindow : Window
     private bool _updatingVideoSlider;
     private bool _videoPaused;
     private Slide? _lastLiveSlide;
+    private string? _activeOverlayId;
 
     private Presentation? SelectedPresentation => (Presentations.SelectedItem as ServiceRow)?.Presentation;
+    private Overlay? ActiveOverlay => _show.Overlays.FirstOrDefault(item => item.Id == _activeOverlayId);
     private int SelectedServiceIndex => (Presentations.SelectedItem as ServiceRow)?.ServiceIndex ?? -1;
 
     public MainWindow()
@@ -90,6 +92,7 @@ public partial class MainWindow : Window
         catch (Exception ex) { MessageBox.Show($"Could not restore Slides data: {ex.Message}"); }
         RefreshFolderChoices();
         RefreshPresentations();
+        RefreshOverlays();
         _runDisplayTimer.Tick += (_, _) => RefreshRunDisplay();
         _runDisplayTimer.Start();
         _videoDisplayTimer.Tick += (_, _) => RefreshVideoTransport();
@@ -173,6 +176,15 @@ public partial class MainWindow : Window
         LibraryList.ItemsSource = visible;
         LibraryList.SelectedItem = visible.FirstOrDefault(presentation => presentation.Id == selectedId)
             ?? visible.FirstOrDefault();
+    }
+
+    private void RefreshOverlays(string? selectedId = null)
+    {
+        selectedId ??= (OverlaysList.SelectedItem as Overlay)?.Id;
+        var overlays = _library.Overlays.OrderBy(item => item.Name).ToArray();
+        OverlaysList.ItemsSource = overlays;
+        OverlaysList.SelectedItem = overlays.FirstOrDefault(item => item.Id == selectedId)
+            ?? overlays.FirstOrDefault();
     }
 
     private void OnLibrarySearchChanged(object sender, TextChangedEventArgs e) => RefreshLibrary();
@@ -424,8 +436,10 @@ public partial class MainWindow : Window
                 ? ShowPackage.Open(picker.FileName, _packageCachePath)
                 : ShowFiles.Load(picker.FileName);
             _library.ImportMissing(opened.Presentations);
+            _library.ImportMissingOverlays(opened.Overlays);
             _library.RepairMissingMediaFrom(opened.Presentations);
             _show = opened;
+            _activeOverlayId = null;
             _run.Reset();
             _run.Select(null);
             Changed(0);
@@ -457,6 +471,7 @@ public partial class MainWindow : Window
         Try(() =>
         {
             _show = new Show { ServiceItems = [], ServiceDate = DateOnly.FromDateTime(DateTime.Today) };
+            _activeOverlayId = null;
             _run.Reset();
             _run.Select(null);
             Changed(0);
@@ -499,8 +514,8 @@ public partial class MainWindow : Window
             _lastLiveSlide = slide;
             _videoPaused = false;
         }
-        Preview.Show(slide, _black);
-        _projection?.ShowSlide(slide, _black);
+        Preview.Show(slide, _black, ActiveOverlay);
+        _projection?.ShowSlide(slide, _black, ActiveOverlay);
         if (_videoPaused)
         {
             Preview.PauseVideo();
@@ -525,6 +540,72 @@ public partial class MainWindow : Window
             _projection?.PlayVideo();
         }
         RefreshVideoTransport();
+    }
+
+    private void NewOverlay(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OverlayDialog { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.EditedOverlay is not { } overlay) return;
+        Try(() =>
+        {
+            _library.UpsertOverlay(overlay);
+            LibraryFiles.Save(_libraryPath, _library);
+            RefreshOverlays(overlay.Id);
+        });
+    }
+
+    private void EditOverlay(object sender, RoutedEventArgs e)
+    {
+        if (OverlaysList.SelectedItem is not Overlay source) return;
+        var dialog = new OverlayDialog(source) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.EditedOverlay is not { } overlay) return;
+        Try(() =>
+        {
+            _library.UpsertOverlay(overlay);
+            if (_show.Overlays.Any(item => item.Id == overlay.Id))
+                _library.AddOverlayToShow(_show, overlay.Id);
+            LibraryFiles.Save(_libraryPath, _library);
+            ShowFiles.Save(_autosavePath, _show);
+            RefreshOverlays(overlay.Id);
+            Render();
+        });
+    }
+
+    private void FireOverlay(object sender, RoutedEventArgs e)
+    {
+        if (OverlaysList.SelectedItem is not Overlay overlay) return;
+        Try(() =>
+        {
+            _library.AddOverlayToShow(_show, overlay.Id);
+            ShowFiles.Save(_autosavePath, _show);
+            _activeOverlayId = overlay.Id;
+            Render();
+        });
+    }
+
+    private void OnOverlayDoubleClick(object sender, MouseButtonEventArgs e) => FireOverlay(sender, e);
+
+    private void ClearOverlay(object sender, RoutedEventArgs e)
+    {
+        _activeOverlayId = null;
+        Render();
+    }
+
+    private void DeleteOverlay(object sender, RoutedEventArgs e)
+    {
+        if (OverlaysList.SelectedItem is not Overlay overlay) return;
+        if (MessageBox.Show(this, $"Delete {overlay.Name} from the overlay library?", "Slides",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Try(() =>
+        {
+            _library.Overlays.RemoveAll(item => item.Id == overlay.Id);
+            _show.Overlays.RemoveAll(item => item.Id == overlay.Id);
+            if (_activeOverlayId == overlay.Id) _activeOverlayId = null;
+            LibraryFiles.Save(_libraryPath, _library);
+            ShowFiles.Save(_autosavePath, _show);
+            RefreshOverlays();
+            Render();
+        });
     }
 
     private void SeekVideo(object sender, RoutedPropertyChangedEventArgs<double> e)

@@ -28,7 +28,8 @@ public sealed class ProjectionWindow : Window
         KeyDown += (_, args) => { if (args.Key == Key.Escape) Close(); };
     }
 
-    public void ShowSlide(Slides.Core.Slide? slide, bool black) => _surface.Show(slide, black);
+    public void ShowSlide(Slides.Core.Slide? slide, bool black, Slides.Core.Overlay? overlay = null) =>
+        _surface.Show(slide, black, overlay);
     public void PlayVideo() => _surface.PlayVideo();
     public void PauseVideo() => _surface.PauseVideo();
     public void SeekVideo(TimeSpan position) => _surface.SeekVideo(position);

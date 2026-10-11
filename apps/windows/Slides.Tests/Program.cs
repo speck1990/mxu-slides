@@ -86,6 +86,37 @@ var cases = new (string Name, Action Run)[]
         try { show.EnsureServiceItems(); throw new Exception("FAIL mismatched service details accepted"); }
         catch (InvalidDataException) { }
     }),
+    ("overlays stay in the library and portable show", () =>
+    {
+        var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var libraryPath = Path.Combine(folder, "library.json");
+            var showPath = Path.Combine(folder, "service.pshow");
+            var packagePath = Path.Combine(folder, "service.slidespack");
+            var overlay = new Overlay { Name = "Verse + Reference", Text = "John 3:16\nFor God so loved the world" };
+            var library = new PresentationLibrary();
+            library.UpsertOverlay(overlay);
+            var show = new Show { ServiceItems = [] };
+            library.AddOverlayToShow(show, overlay.Id);
+            LibraryFiles.Save(libraryPath, library);
+            ShowFiles.Save(showPath, show);
+            ShowPackage.Save(packagePath, show);
+            Check(LibraryFiles.Load(libraryPath).Overlays.Single().Text == overlay.Text,
+                "overlay remains available after library reload");
+            Check(ShowFiles.Load(showPath).Overlays.Single().Name == overlay.Name &&
+                ShowPackage.Open(packagePath, Path.Combine(folder, "cache")).Overlays.Single().Id == overlay.Id,
+                "overlay survives show and package round trips");
+            var nextShow = new Show { ServiceItems = [] };
+            LibraryFiles.Load(libraryPath).AddOverlayToShow(nextShow, overlay.Id);
+            Check(nextShow.Overlays.Single().Id == overlay.Id, "overlay can be reused in a new show");
+            overlay.Layout = "unsupported";
+            try { library.UpsertOverlay(overlay); throw new Exception("FAIL invalid overlay accepted"); }
+            catch (InvalidDataException) { }
+        }
+        finally { Directory.Delete(folder, true); }
+    }),
     ("live service timing follows occurrences and survives pause and reorder", () =>
     {
         var clock = new ManualClock();
