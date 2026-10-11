@@ -32,6 +32,7 @@ public static partial class SongParser
         var sectionSlide = 0;
         var unlabelledVerse = 0;
         var hasHeading = false;
+        var sectionId = Guid.NewGuid().ToString("N");
 
         void Flush()
         {
@@ -42,7 +43,8 @@ public static partial class SongParser
                 Name = hasHeading
                     ? sectionSlide == 1 ? section : $"{section} ({sectionSlide})"
                     : $"Verse {++unlabelledVerse}",
-                Text = string.Join("\n", stanza)
+                Text = string.Join("\n", stanza),
+                SectionId = hasHeading ? sectionId : Guid.NewGuid().ToString("N")
             });
             stanza.Clear();
         }
@@ -57,6 +59,7 @@ public static partial class SongParser
                 section = header;
                 sectionSlide = 0;
                 hasHeading = true;
+                sectionId = Guid.NewGuid().ToString("N");
             }
             else if (line.Length == 0) Flush();
             else stanza.Add(line);
@@ -67,8 +70,18 @@ public static partial class SongParser
         return presentation;
     }
 
-    public static string ToEditableLyrics(Presentation song) =>
-        string.Join("\n\n", song.Slides.Select(slide => $"[{slide.Name}]\n{slide.Text}"));
+    public static string ToEditableLyrics(Presentation song)
+    {
+        var parts = new List<string>();
+        string? previousSectionId = null;
+        foreach (var slide in song.Slides)
+        {
+            var sameSection = slide.SectionId is { Length: > 0 } && slide.SectionId == previousSectionId;
+            parts.Add(sameSection ? slide.Text : $"[{slide.Name}]\n{slide.Text}");
+            previousSectionId = slide.SectionId;
+        }
+        return string.Join("\n\n", parts);
+    }
 
     // Early Windows builds treated bare headings as lyrics and numbered every slide Verse N.
     // Repair only that exact legacy shape when an existing show is opened.

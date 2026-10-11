@@ -51,6 +51,27 @@ public static partial class PresentationEditing
 
     public static void PreserveSongDesign(Presentation original, Presentation replacement)
     {
+        var previousBlocks = PresentationArrangements.Blocks(original)
+            .GroupBy(block => block.Name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => new Queue<SongBlock>(group), StringComparer.OrdinalIgnoreCase);
+        foreach (var block in PresentationArrangements.Blocks(replacement))
+        {
+            if (!previousBlocks.TryGetValue(block.Name, out var matches) || matches.Count == 0) continue;
+            var previousId = matches.Dequeue().Id;
+            foreach (var slide in block.Slides) slide.SectionId = previousId;
+        }
+        replacement.Arrangements = original.Arrangements.Select(arrangement => new SlideArrangement
+        {
+            Id = arrangement.Id,
+            Name = arrangement.Name,
+            BlockIds = arrangement.BlockIds.ToList()
+        }).ToList();
+        var currentBlockIds = PresentationArrangements.Blocks(replacement).Select(block => block.Id).ToArray();
+        foreach (var arrangement in replacement.Arrangements)
+        {
+            arrangement.BlockIds.RemoveAll(id => !currentBlockIds.Contains(id));
+            if (arrangement.BlockIds.Count == 0) arrangement.BlockIds.AddRange(currentBlockIds);
+        }
         for (var index = 0; index < replacement.Slides.Count && original.Slides.Count > 0; index++)
         {
             var source = original.Slides[Math.Min(index, original.Slides.Count - 1)];
@@ -86,6 +107,7 @@ public static partial class PresentationEditing
             throw new ArgumentException("Enter a presentation title.");
         if (presentation.Slides.Count == 0)
             throw new ArgumentException("Add at least one slide.");
+        PresentationArrangements.Validate(presentation);
         foreach (var slide in presentation.Slides)
         {
             if (string.IsNullOrWhiteSpace(slide.Name))

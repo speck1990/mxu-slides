@@ -20,6 +20,48 @@ var cases = new (string Name, Action Run)[]
             .SequenceEqual(song.Slides.Select(slide => slide.Name)), "editing preserves section labels");
         Check(SongParser.Parse("A song", "Bridge over troubled water").Slides[0].Text == "Bridge over troubled water", "lyrics are not mistaken for headings");
     }),
+    ("song arrangements repeat whole sections independently per service occurrence", () =>
+    {
+        var song = SongParser.Parse("Song", "[Verse 1]\nLine A\n\nLine B\n[Chorus]\nSing\n[Verse 2]\nLine C");
+        var blocks = PresentationArrangements.Blocks(song);
+        Check(blocks.Count == 3 && blocks[0].Slides.Count == 2, "two verse slides form one block");
+        var sunday = PresentationArrangements.Add(song, "Sunday");
+        sunday.BlockIds = [blocks[0].Id, blocks[1].Id, blocks[2].Id, blocks[1].Id];
+        var acoustic = PresentationArrangements.Add(song, "Acoustic");
+        acoustic.BlockIds = [blocks[1].Id, blocks[0].Id];
+        Check(PresentationArrangements.Slides(song, sunday.Id).Select(slide => slide.Text)
+            .SequenceEqual(["Line A", "Line B", "Sing", "Line C", "Sing"]), "chorus repeats without copying storage");
+        var show = new Show { Presentations = [song], ServiceItems = [] };
+        show.AddToService(song.Id);
+        show.AddToService(song.Id);
+        show.SetServiceArrangement(0, sunday.Id);
+        show.SetServiceArrangement(1, acoustic.Id);
+        Check(StageCue.For(show, 0, 3).NextText == "Sing" &&
+            StageCue.For(show, 0, 4).NextText == "Sing", "stage cue follows repeated chorus and next occurrence");
+        var duplicateIndex = show.DuplicateServiceItem(0);
+        Check(show.ServiceDetails![duplicateIndex].ArrangementId == sunday.Id, "duplicate keeps selected arrangement");
+        show.SetServiceArrangement(duplicateIndex, null);
+        Check(show.ServiceDetails[0].ArrangementId == sunday.Id, "occurrences select arrangements independently");
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pshow");
+        try
+        {
+            ShowFiles.Save(path, show);
+            var reopened = ShowFiles.Load(path);
+            Check(reopened.ServiceDetails![0].ArrangementId == sunday.Id &&
+                PresentationArrangements.Slides(reopened.Presentations[0], sunday.Id).Count == 5,
+                "arrangement survives show save");
+        }
+        finally { File.Delete(path); }
+        var edited = SongParser.Parse(song.Name, SongParser.ToEditableLyrics(song));
+        PresentationEditing.PreserveSongDesign(song, edited);
+        Check(PresentationArrangements.Slides(edited, sunday.Id).Count == 5,
+            "quick lyric edit preserves sections and arrangement");
+        var library = new PresentationLibrary();
+        library.Upsert(song);
+        var copy = library.Duplicate(song.Id);
+        Check(PresentationArrangements.Slides(copy, copy.Arrangements[0].Id).Count == 5,
+            "library duplicate keeps an independent usable arrangement");
+    }),
     ("old Windows song headings are repaired when a show opens", () =>
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pshow");
