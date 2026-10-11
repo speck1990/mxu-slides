@@ -758,6 +758,60 @@ var cases = new (string Name, Action Run)[]
         }
         finally { File.Delete(path); }
     }),
+    ("PowerPoint text import follows slide relationships and geometry", () =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".pptx");
+        try
+        {
+            using (var archive = ZipFile.Open(path, ZipArchiveMode.Create))
+            {
+                void Write(string name, string contents)
+                {
+                    using var writer = new StreamWriter(archive.CreateEntry(name).Open());
+                    writer.Write(contents);
+                }
+                Write("ppt/presentation.xml", """
+                    <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                      <p:sldIdLst><p:sldId id="1" r:id="rId2"/><p:sldId id="2" r:id="rId1"/></p:sldIdLst>
+                      <p:sldSz cx="9600000" cy="5400000"/>
+                    </p:presentation>
+                    """);
+                Write("ppt/_rels/presentation.xml.rels", """
+                    <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+                      <Relationship Id="rId1" Target="slides/slide1.xml"/>
+                      <Relationship Id="rId2" Target="slides/slide2.xml"/>
+                    </Relationships>
+                    """);
+                Write("ppt/slides/slide1.xml", """
+                    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                      <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="123456"/></a:solidFill></p:bgPr></p:bg>
+                        <p:spTree><p:sp><p:nvSpPr><p:cNvPr name="Title"/></p:nvSpPr>
+                          <p:spPr><a:xfrm><a:off x="1000000" y="500000"/><a:ext cx="4000000" cy="1000000"/></a:xfrm></p:spPr>
+                          <p:txBody><a:p><a:r><a:rPr sz="4000" b="1"><a:solidFill><a:srgbClr val="ABCDEF"/></a:solidFill></a:rPr><a:t>Hello</a:t></a:r></a:p></p:txBody>
+                        </p:sp></p:spTree>
+                      </p:cSld>
+                    </p:sld>
+                    """);
+                Write("ppt/slides/slide2.xml", """
+                    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                      <p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>First in show</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld>
+                    </p:sld>
+                    """);
+            }
+            var imported = PowerPointImport.Load(path);
+            Check(imported.Presentation.Slides.Select(slide => slide.Text)
+                .SequenceEqual(["First in show", "Hello"]), "slide order follows presentation relationships");
+            var slide = imported.Presentation.Slides[1];
+            Check(slide.Background == "#123456FF" && slide.Elements![0].X == 100 &&
+                slide.Elements[0].Y == 50 && slide.Elements[0].Width == 400 &&
+                slide.Elements[0].TextStyle?.ColorHex == "#ABCDEFFF", "solid background and text geometry import");
+            Check(PowerPointImport.Resolve("ppt/slides/slide1.xml", "../media/image.png") == "ppt/media/image.png",
+                "relative media target stays inside package");
+            try { PowerPointImport.Resolve("ppt/slides/slide1.xml", "../../../outside"); throw new Exception("FAIL unsafe target"); }
+            catch (InvalidDataException) { }
+        }
+        finally { File.Delete(path); }
+    }),
     ("MxU positioned text and shapes use the Mac canvas geometry", () =>
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
