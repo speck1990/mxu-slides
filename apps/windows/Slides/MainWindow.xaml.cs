@@ -679,8 +679,15 @@ public partial class MainWindow : Window
             MessageBox.Show(this, "The stage display is using that screen. Choose another audience display or close the stage display.", "Slides");
             return;
         }
-        _projection = new ProjectionWindow(screens[index]);
-        _projection.Closed += (_, _) =>
+        var projection = new ProjectionWindow(screens[index]);
+        _projection = projection;
+        projection.VideoOpened += (_, _) =>
+        {
+            if (!ReferenceEquals(_projection, projection)) return;
+            projection.SeekVideo(Preview.VideoPosition);
+            if (_videoPaused) projection.PauseVideo();
+        };
+        projection.Closed += (_, _) =>
         {
             _projection = null;
             ProjectButton.Content = "Start Projection  (F5)";

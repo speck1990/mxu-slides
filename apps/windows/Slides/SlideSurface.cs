@@ -43,6 +43,7 @@ public sealed class SlideSurface : Grid
     private readonly Border _blackCover = new() { Background = Brushes.Black, Visibility = Visibility.Collapsed };
     private readonly Border _clearCover = new() { Background = Brushes.Black, Visibility = Visibility.Collapsed };
     public event EventHandler? VideoStateChanged;
+    public event EventHandler? VideoOpened;
 
     public bool HasVideo => _video is not null;
     public bool VideoPlaying => _video is not null && _videoPlaying;
@@ -178,8 +179,18 @@ public sealed class SlideSurface : Grid
                         Stretch = Stretch.UniformToFill
                     };
                     var video = _video;
-                    video.MediaEnded += (_, _) => { video.Position = TimeSpan.Zero; video.Play(); };
-                    _video.MediaOpened += (_, _) => VideoStateChanged?.Invoke(this, EventArgs.Empty);
+                    video.MediaEnded += (_, _) =>
+                    {
+                        if (!ReferenceEquals(_video, video)) return;
+                        video.Position = TimeSpan.Zero;
+                        video.Play();
+                    };
+                    video.MediaOpened += (_, _) =>
+                    {
+                        if (!ReferenceEquals(_video, video)) return;
+                        VideoStateChanged?.Invoke(this, EventArgs.Empty);
+                        VideoOpened?.Invoke(this, EventArgs.Empty);
+                    };
                     AddContent(_video);
                     _video.Play();
                     _videoPlaying = true;

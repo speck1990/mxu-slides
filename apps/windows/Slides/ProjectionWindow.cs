@@ -11,10 +11,12 @@ public sealed class ProjectionWindow : Window
 {
     private readonly SlideSurface _surface = new() { Width = 960, Height = 540 };
     public string DisplayDeviceName { get; }
+    public event EventHandler? VideoOpened;
 
     public ProjectionWindow(Forms.Screen display)
     {
         DisplayDeviceName = display.DeviceName;
+        _surface.VideoOpened += (_, _) => VideoOpened?.Invoke(this, EventArgs.Empty);
         Title = "Slides Audience";
         Content = new Viewbox { Child = _surface, Stretch = Stretch.Uniform };
         Background = System.Windows.Media.Brushes.Black;
