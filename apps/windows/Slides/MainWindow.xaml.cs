@@ -29,8 +29,8 @@ public partial class MainWindow : Window
         public string Subtitle => string.Join(" · ", new[]
         {
             Presentation.Arrangements.FirstOrDefault(item => item.Id == Details.ArrangementId)?.Name ?? "",
-            details.PlannedMinutes is { } minutes ? $"{minutes} min" : "",
-            details.Notes.Split('\n')[0].Trim()
+            Details.PlannedMinutes is { } minutes ? $"{minutes} min" : "",
+            Details.Notes.Split('\n')[0].Trim()
         }.Where(value => value.Length > 0));
         public Visibility SubtitleVisibility => Subtitle.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
