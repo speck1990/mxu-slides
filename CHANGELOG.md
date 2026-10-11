@@ -4,6 +4,7 @@
 
 ### Added
 
+- Windows positioned image objects with fit, fill, or stretch scaling on the slide canvas; portable shows and media relinking now include these images.
 - Windows Edit Layout canvas dragging and corner resizing for positioned objects, plus solid ellipses and ellipse import from standalone MxU Presentation JSON.
 - Windows positioned slide layout editing for multiple text objects and solid rectangles; basic Mac Presentation JSON object geometry now imports onto the shared 16:9 canvas.
 - Windows per-slide typography controls and four Mac-inspired starter palettes, basic MxU text-style import, and consistent 16:9 scaling between preview and audience projection.

@@ -9,10 +9,10 @@ public static class MediaRelinker
         if (!Directory.Exists(searchFolder))
             throw new DirectoryNotFoundException("Choose a folder containing the missing media files.");
 
-        var missing = presentations.SelectMany(presentation => presentation.Slides)
-            .Where(slide => !string.IsNullOrWhiteSpace(slide.MediaPath) && !File.Exists(slide.MediaPath))
+        var missing = MediaPaths.All(presentations)
+            .Where(reference => !string.IsNullOrWhiteSpace(reference.Path) && !File.Exists(reference.Path))
             .ToArray();
-        var neededNames = missing.Select(slide => FileName(slide.MediaPath!))
+        var neededNames = missing.Select(reference => FileName(reference.Path!))
             .Where(name => name.Length > 0).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var matches = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         if (neededNames.Count > 0)
@@ -30,14 +30,14 @@ public static class MediaRelinker
         var updated = 0;
         var unresolved = 0;
         var ambiguous = 0;
-        foreach (var slide in missing)
+        foreach (var reference in missing)
         {
-            var name = FileName(slide.MediaPath!);
+            var name = FileName(reference.Path!);
             if (!matches.TryGetValue(name, out var paths)) unresolved++;
             else if (paths.Count != 1) ambiguous++;
             else
             {
-                slide.MediaPath = paths[0];
+                reference.Path = paths[0];
                 updated++;
             }
         }

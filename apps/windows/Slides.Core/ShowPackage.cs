@@ -21,10 +21,15 @@ public static partial class ShowPackage
         var copy = ShowFiles.Parse(JsonSerializer.Serialize(show, ShowFiles.Json));
         var media = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var entries = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var slide in copy.Presentations.SelectMany(presentation => presentation.Slides))
+        foreach (var reference in MediaPaths.All(copy.Presentations))
         {
-            if (string.IsNullOrWhiteSpace(slide.MediaPath)) continue;
-            var source = Path.GetFullPath(slide.MediaPath);
+            if (string.IsNullOrWhiteSpace(reference.Path))
+            {
+                if (reference.IsPositionedImage)
+                    throw new FileNotFoundException("A positioned image is missing. Use Relink Media before packing this show.");
+                continue;
+            }
+            var source = Path.GetFullPath(reference.Path);
             if (!File.Exists(source))
                 throw new FileNotFoundException("Media is missing. Use Relink Media before packing this show.", source);
             if (!media.TryGetValue(source, out var entryPath))
@@ -34,7 +39,7 @@ public static partial class ShowPackage
                 media[source] = entryPath;
                 entries.TryAdd(entryPath, source);
             }
-            slide.MediaPath = entryPath;
+            reference.Path = entryPath;
         }
 
         var showJson = JsonSerializer.Serialize(copy, ShowFiles.Json);
@@ -83,9 +88,12 @@ public static partial class ShowPackage
         using (var reader = new StreamReader(showEntry.Open(), Encoding.UTF8))
             show = ShowFiles.Parse(reader.ReadToEnd());
 
-        var paths = show.Presentations.SelectMany(presentation => presentation.Slides)
-            .Where(slide => !string.IsNullOrWhiteSpace(slide.MediaPath))
-            .Select(slide => slide.MediaPath!).Distinct(StringComparer.Ordinal).ToArray();
+        var references = MediaPaths.All(show.Presentations).ToArray();
+        if (references.Any(reference => reference.IsPositionedImage && string.IsNullOrWhiteSpace(reference.Path)))
+            throw new InvalidDataException("The package contains a positioned image without media.");
+        var paths = references
+            .Where(reference => !string.IsNullOrWhiteSpace(reference.Path))
+            .Select(reference => reference.Path!).Distinct(StringComparer.Ordinal).ToArray();
         long totalBytes = 0;
         var resolved = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var entryPath in paths)
@@ -102,9 +110,9 @@ public static partial class ShowPackage
                 ExtractVerified(entry, destination, expectedHash);
             resolved[entryPath] = destination;
         }
-        foreach (var slide in show.Presentations.SelectMany(presentation => presentation.Slides))
-            if (slide.MediaPath is { Length: > 0 } entryPath)
-                slide.MediaPath = resolved[entryPath];
+        foreach (var reference in references)
+            if (reference.Path is { Length: > 0 } entryPath)
+                reference.Path = resolved[entryPath];
         return show;
     }
 

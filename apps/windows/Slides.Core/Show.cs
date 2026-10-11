@@ -71,6 +71,8 @@ public sealed class SlideElement
     public double Height { get; set; } = 480;
     public string FillColorHex { get; set; } = "#3B82F6FF";
     public string ShapeKind { get; set; } = "rectangle";
+    public string? MediaPath { get; set; }
+    public string MediaScaleMode { get; set; } = "fit";
     public double CornerRadius { get; set; }
     public SlideTextStyle? TextStyle { get; set; }
 }
