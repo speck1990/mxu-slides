@@ -798,7 +798,8 @@ var cases = new (string Name, Action Run)[]
                     """);
                 Write("ppt/slides/slide2.xml", """
                     <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-                      <p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>First in show</a:t></a:r></a:p></p:txBody></p:sp>
+                      <p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr name="Body"/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+                        <p:txBody><a:p><a:r><a:t>First in show</a:t></a:r></a:p></p:txBody></p:sp>
                         <p:pic><p:nvPicPr><p:cNvPr name="Picture"/></p:nvPicPr><p:blipFill><a:blip r:embed="img1"/></p:blipFill>
                           <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="9600000" cy="5400000"/></a:xfrm></p:spPr>
                         </p:pic></p:spTree></p:cSld>
@@ -807,7 +808,17 @@ var cases = new (string Name, Action Run)[]
                 Write("ppt/slides/_rels/slide2.xml.rels", """
                     <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
                       <Relationship Id="img1" Target="../media/image1.png"/>
+                      <Relationship Id="layout1" Target="../slideLayouts/slideLayout1.xml"/>
                     </Relationships>
+                    """);
+                Write("ppt/slideLayouts/slideLayout1.xml", """
+                    <p:sldLayout xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+                      <p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="FEF3C7"/></a:solidFill></p:bgPr></p:bg>
+                        <p:spTree><p:sp><p:nvSpPr><p:cNvPr name="Body"/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+                          <p:spPr><a:xfrm><a:off x="2000000" y="1000000"/><a:ext cx="5000000" cy="2000000"/></a:xfrm></p:spPr>
+                        </p:sp></p:spTree>
+                      </p:cSld>
+                    </p:sldLayout>
                     """);
                 using var image = archive.CreateEntry("ppt/media/image1.png").Open();
                 image.Write([1, 2, 3, 4]);
@@ -815,6 +826,9 @@ var cases = new (string Name, Action Run)[]
             var imported = PowerPointImport.Load(path, cache);
             Check(imported.Presentation.Slides.Select(slide => slide.Text)
                 .SequenceEqual(["First in show", "Hello"]), "slide order follows presentation relationships");
+            Check(imported.Presentation.Slides[0].Background == "#FEF3C7FF" &&
+                imported.Presentation.Slides[0].Elements!.Single(item => item.Kind == "text").X == 200,
+                "slide layout supplies missing placeholder geometry and background");
             var imageElement = imported.Presentation.Slides[0].Elements!.Single(item => item.Kind == "image");
             Check(imageElement.Name == "Picture" && imageElement.Width == 960 &&
                 File.ReadAllBytes(imageElement.MediaPath!).SequenceEqual(new byte[] { 1, 2, 3, 4 }),

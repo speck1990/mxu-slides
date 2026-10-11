@@ -44,16 +44,22 @@ public static class PowerPointImport
                 throw new InvalidDataException("A PowerPoint slide relationship is missing.");
             var slidePath = Resolve("ppt/presentation.xml", target);
             var source = Xml(archive, slidePath);
+            var slideRelationships = OptionalRelationships(archive, RelationshipPart(slidePath));
+            var layoutTarget = slideRelationships.Values.FirstOrDefault(value =>
+                value.Contains("slideLayout", StringComparison.OrdinalIgnoreCase));
+            var layout = layoutTarget is null ? null : Xml(archive, Resolve(slidePath, layoutTarget));
+            var layoutShapes = layout?.Root?.Element(P + "cSld")?.Element(P + "spTree")?.Elements(P + "sp")
+                .ToArray() ?? [];
             var slide = new Slide
             {
                 Name = $"Slide {presentation.Slides.Count + 1}",
                 Background = Color(source.Root?.Element(P + "cSld")?.Element(P + "bg")?.Element(P + "bgPr"))
+                    ?? Color(layout?.Root?.Element(P + "cSld")?.Element(P + "bg")?.Element(P + "bgPr"))
                     ?? "#FFFFFFFF",
                 TextStyle = new SlideTextStyle { ColorHex = "#000000FF" }
             };
             var elements = new List<SlideElement>();
             var summary = new List<string>();
-            Dictionary<string, string>? slideRelationships = null;
             foreach (var child in source.Root?.Element(P + "cSld")?.Element(P + "spTree")?.Elements()
                          ?? Enumerable.Empty<XElement>())
             {
@@ -62,7 +68,8 @@ public static class PowerPointImport
                     var text = string.Join("\n", child.Element(P + "txBody")?.Elements(A + "p")
                         .Select(paragraph => string.Concat(paragraph.Descendants(A + "t").Select(value => value.Value)))
                         .Where(line => !string.IsNullOrWhiteSpace(line)) ?? []);
-                    var geometry = Geometry(child.Element(P + "spPr"), slideWidth, slideHeight);
+                    var geometry = Geometry(child.Element(P + "spPr"), slideWidth, slideHeight)
+                        ?? PlaceholderGeometry(child, layoutShapes, slideWidth, slideHeight);
                     var fill = Color(child.Element(P + "spPr"));
                     var shape = (string?)child.Element(P + "spPr")?.Element(A + "prstGeom")?.Attribute("prst");
                     var name = SafeName((string?)child.Element(P + "nvSpPr")?.Element(P + "cNvPr")?.Attribute("name"), "Object");
@@ -97,7 +104,6 @@ public static class PowerPointImport
                     var box = Geometry(child.Element(P + "spPr"), slideWidth, slideHeight);
                     var embed = (string?)child.Element(P + "blipFill")?.Element(A + "blip")?.Attribute(R + "embed");
                     if (box is null || embed is null) { skipped++; continue; }
-                    slideRelationships ??= Relationships(archive, RelationshipPart(slidePath));
                     if (!slideRelationships.TryGetValue(embed, out var imageTarget)) { skipped++; continue; }
                     var imagePath = Resolve(slidePath, imageTarget);
                     var extension = Path.GetExtension(imagePath).ToLowerInvariant();
@@ -150,6 +156,27 @@ public static class PowerPointImport
                 item => (string?)item.Attribute("Target")
                     ?? throw new InvalidDataException("A PowerPoint relationship has no target."))
         ?? throw new InvalidDataException("The PowerPoint relationship list is missing.");
+
+    private static Dictionary<string, string> OptionalRelationships(ZipArchive archive, string name) =>
+        archive.Entries.Any(entry => entry.FullName == name) ? Relationships(archive, name) : [];
+
+    private static (double X, double Y, double Width, double Height)? PlaceholderGeometry(
+        XElement shape, XElement[] layoutShapes, double slideWidth, double slideHeight)
+    {
+        var placeholder = shape.Element(P + "nvSpPr")?.Element(P + "nvPr")?.Element(P + "ph");
+        if (placeholder is null) return null;
+        var index = (string?)placeholder.Attribute("idx");
+        var type = (string?)placeholder.Attribute("type") ?? "obj";
+        var candidates = layoutShapes.Where(item =>
+        {
+            var layoutPlaceholder = item.Element(P + "nvSpPr")?.Element(P + "nvPr")?.Element(P + "ph");
+            return layoutPlaceholder is not null &&
+                (index is null || (string?)layoutPlaceholder.Attribute("idx") == index) &&
+                ((string?)layoutPlaceholder.Attribute("type") ?? "obj") == type;
+        }).ToArray();
+        return candidates.Length == 1
+            ? Geometry(candidates[0].Element(P + "spPr"), slideWidth, slideHeight) : null;
+    }
 
     private static string RelationshipPart(string partPath)
     {
