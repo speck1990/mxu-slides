@@ -814,7 +814,7 @@ var cases = new (string Name, Action Run)[]
                 .SequenceEqual(["First in show", "Hello"]), "slide order follows presentation relationships");
             var imageElement = imported.Presentation.Slides[0].Elements!.Single(item => item.Kind == "image");
             Check(imageElement.Name == "Picture" && imageElement.Width == 960 &&
-                File.ReadAllBytes(imageElement.MediaPath!).SequenceEqual([1, 2, 3, 4]),
+                File.ReadAllBytes(imageElement.MediaPath!).SequenceEqual(new byte[] { 1, 2, 3, 4 }),
                 "embedded image is cached and positioned");
             var package = Path.Combine(cache, "imported.slidespack");
             ShowPackage.Save(package, new Show
