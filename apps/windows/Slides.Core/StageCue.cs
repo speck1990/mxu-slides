@@ -13,22 +13,25 @@ public sealed record StageCue(string CurrentHeading, string CurrentText, string 
             .ToDictionary(group => group.Key, group => group.First());
         if (!byId.TryGetValue(show.ServiceItems[serviceIndex], out var presentation)) return Empty;
         var details = show.ServiceDetails![serviceIndex];
-        var current = slideIndex >= 0 && slideIndex < presentation.Slides.Count
-            ? presentation.Slides[slideIndex] : null;
+        var slides = PresentationArrangements.Slides(presentation, details.ArrangementId);
+        var current = slideIndex >= 0 && slideIndex < slides.Count
+            ? slides[slideIndex] : null;
         Slide? next = null;
         Presentation? nextPresentation = null;
-        if (slideIndex + 1 < presentation.Slides.Count)
+        if (slideIndex + 1 < slides.Count)
         {
-            next = presentation.Slides[slideIndex + 1];
+            next = slides[slideIndex + 1];
             nextPresentation = presentation;
         }
         else
         {
             for (var index = serviceIndex + 1; index < show.ServiceItems.Count; index++)
             {
-                if (!byId.TryGetValue(show.ServiceItems[index], out var candidate) || candidate.Slides.Count == 0)
+                if (!byId.TryGetValue(show.ServiceItems[index], out var candidate))
                     continue;
-                next = candidate.Slides[0];
+                var candidateSlides = PresentationArrangements.Slides(candidate, show.ServiceDetails[index].ArrangementId);
+                if (candidateSlides.Count == 0) continue;
+                next = candidateSlides[0];
                 nextPresentation = candidate;
                 break;
             }

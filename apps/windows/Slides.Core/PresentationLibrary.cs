@@ -112,6 +112,7 @@ public sealed class PresentationLibrary
 
     public void Upsert(Presentation presentation)
     {
+        PresentationArrangements.Validate(presentation);
         var copy = Copy(presentation);
         var index = Presentations.FindIndex(item => item.Id == presentation.Id);
         if (index < 0) Presentations.Add(copy);
@@ -125,11 +126,21 @@ public sealed class PresentationLibrary
         var duplicate = Copy(source);
         duplicate.Id = Guid.NewGuid().ToString("N");
         duplicate.Name = source.Name + " Copy";
+        var legacyBlockIds = new Dictionary<string, string>();
         foreach (var slide in duplicate.Slides)
         {
+            var originalId = slide.Id;
             slide.Id = Guid.NewGuid().ToString("N");
+            if (slide.SectionId is null) legacyBlockIds[originalId] = slide.Id;
             if (slide.Elements is null) continue;
             foreach (var element in slide.Elements) element.Id = Guid.NewGuid().ToString("N");
+        }
+        foreach (var arrangement in duplicate.Arrangements)
+        {
+            arrangement.Id = Guid.NewGuid().ToString("N");
+            for (var index = 0; index < arrangement.BlockIds.Count; index++)
+                if (legacyBlockIds.TryGetValue(arrangement.BlockIds[index], out var id))
+                    arrangement.BlockIds[index] = id;
         }
         Presentations.Add(duplicate);
         if (FolderFor(presentationId) is { } folderId) FolderAssignments[duplicate.Id] = folderId;
@@ -207,6 +218,7 @@ public static class LibraryFiles
             library.FolderAssignments is null)
             throw new InvalidDataException("Unsupported library file version.");
         Overlay.ValidateList(library.Overlays);
+        foreach (var presentation in library.Presentations) PresentationArrangements.Validate(presentation);
         if (library.Presentations.Select(item => item.Id).Distinct().Count() != library.Presentations.Count)
             throw new InvalidDataException("The library contains duplicate presentation IDs.");
         if (library.Folders.Select(item => item.Id).Distinct().Count() != library.Folders.Count ||

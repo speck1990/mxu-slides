@@ -28,8 +28,9 @@ public partial class MainWindow : Window
         public Visibility HeaderVisibility => startsSection ? Visibility.Visible : Visibility.Collapsed;
         public string Subtitle => string.Join(" · ", new[]
         {
-            details.PlannedMinutes is { } minutes ? $"{minutes} min" : "",
-            details.Notes.Split('\n')[0].Trim()
+            Presentation.Arrangements.FirstOrDefault(item => item.Id == Details.ArrangementId)?.Name ?? "",
+            Details.PlannedMinutes is { } minutes ? $"{minutes} min" : "",
+            Details.Notes.Split('\n')[0].Trim()
         }.Where(value => value.Length > 0));
         public Visibility SubtitleVisibility => Subtitle.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
@@ -374,6 +375,38 @@ public partial class MainWindow : Window
         });
     }
 
+    private void EditLibraryArrangements(object sender, RoutedEventArgs e)
+    {
+        if (LibraryList.SelectedItem is not Presentation { Kind: "song" } source) return;
+        OpenArrangementEditor(source);
+    }
+
+    private void EditArrangements(object sender, RoutedEventArgs e)
+    {
+        if (SelectedPresentation is not { Kind: "song" } source) return;
+        OpenArrangementEditor(source);
+    }
+
+    private void OpenArrangementEditor(Presentation source)
+    {
+        var editor = new ArrangementEditor(source) { Owner = this };
+        if (editor.ShowDialog() != true) return;
+        Try(() =>
+        {
+            var edited = editor.EditedPresentation;
+            _library.Upsert(edited);
+            var showIndex = _show.Presentations.FindIndex(item => item.Id == edited.Id);
+            if (showIndex >= 0) _show.Presentations[showIndex] = PresentationEditing.Copy(edited);
+            _show.EnsureServiceItems();
+            foreach (var (details, index) in _show.ServiceDetails!.Select((details, index) => (details, index)))
+                if (_show.ServiceItems![index] == edited.Id && details.ArrangementId is { } arrangementId &&
+                    !edited.Arrangements.Any(item => item.Id == arrangementId))
+                    details.ArrangementId = null;
+            Changed(SelectedServiceIndex);
+            LibraryList.SelectedItem = _library.Presentations.First(item => item.Id == edited.Id);
+        });
+    }
+
     private void DuplicateLibraryItem(object sender, RoutedEventArgs e)
     {
         if (LibraryList.SelectedItem is not Presentation source) return;
@@ -457,11 +490,13 @@ public partial class MainWindow : Window
     {
         var index = SelectedServiceIndex;
         if (index < 0) return;
-        var dialog = new ServiceItemDialog(_show.ServiceDetails![index]) { Owner = this };
+        if (SelectedPresentation is not { } presentation) return;
+        var dialog = new ServiceItemDialog(_show.ServiceDetails![index], presentation) { Owner = this };
         if (dialog.ShowDialog() != true) return;
         Try(() =>
         {
             _show.UpdateServiceItem(index, dialog.Section, dialog.Notes, dialog.PlannedMinutes);
+            _show.SetServiceArrangement(index, dialog.ArrangementId);
             Changed(index);
         });
     }
@@ -617,8 +652,11 @@ public partial class MainWindow : Window
         _run.Select((Presentations.SelectedItem as ServiceRow)?.Details.Id);
         RefreshRunDisplay();
         var presentation = SelectedPresentation;
-        SelectionTitle.Text = presentation?.Name ?? "Select an item in Service Flow";
-        Slides.ItemsSource = presentation?.Slides.Select((slide, index) =>
+        var arrangementId = (Presentations.SelectedItem as ServiceRow)?.Details.ArrangementId;
+        var arrangementName = presentation?.Arrangements.FirstOrDefault(item => item.Id == arrangementId)?.Name;
+        SelectionTitle.Text = presentation is null ? "Select an item in Service Flow" :
+            presentation.Name + (arrangementName is null ? "" : $" · {arrangementName}");
+        Slides.ItemsSource = presentation is null ? null : PresentationArrangements.Slides(presentation, arrangementId).Select((slide, index) =>
             new SlideCard(index + 1, slide)).ToArray();
         if (Slides.Items.Count > 0) Slides.SelectedIndex = 0;
         else Render();

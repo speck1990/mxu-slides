@@ -139,6 +139,7 @@
           <Button x:Name="VisualPowerPointButton" Content="Import PPTX" Click="ImportPowerPoint" ToolTip="Render every slide with installed Microsoft PowerPoint for faithful colors and layouts" />
           <Button Content="PPTX Editable" Click="ImportPowerPointEditable" ToolTip="Import supported text, shapes, and images as editable objects; some colors and effects may differ" />
           <Button Content="Edit" Click="EditLibraryItem" />
+          <Button Content="Arrangements" Click="EditLibraryArrangements" ToolTip="Build song section orders for services" />
           <Button Content="Duplicate" Click="DuplicateLibraryItem" />
           <Button Content="Delete" Click="DeleteLibraryItem" />
           <Button Content="Move To" Click="MoveLibraryItem" />
@@ -157,6 +158,7 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
             <Button Content="Edit Song" Click="EditSong" />
             <Button Content="Edit Slides" Click="EditSlides" />
+            <Button Content="Arrangements" Click="EditArrangements" ToolTip="Repeat or reorder song sections" />
             <Button Content="New Show" Click="NewShow" />
             <Button Content="Open Show" Click="OpenShow" />
             <Button Content="Save As" Click="SaveShowAs" />

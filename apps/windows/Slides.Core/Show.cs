@@ -54,7 +54,8 @@ public sealed class Show
         {
             Section = source.Section,
             Notes = source.Notes,
-            PlannedMinutes = source.PlannedMinutes
+            PlannedMinutes = source.PlannedMinutes,
+            ArrangementId = source.ArrangementId
         });
         return index + 1;
     }
@@ -84,6 +85,18 @@ public sealed class Show
         item.Notes = notes;
         item.PlannedMinutes = plannedMinutes;
     }
+
+    public void SetServiceArrangement(int index, string? arrangementId)
+    {
+        EnsureServiceItems();
+        if (index < 0 || index >= ServiceItems!.Count)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        var presentation = Presentations.FirstOrDefault(item => item.Id == ServiceItems[index]);
+        if (arrangementId is not null &&
+            (presentation is null || !presentation.Arrangements.Any(item => item.Id == arrangementId)))
+            throw new ArgumentException("Choose an arrangement from this song.", nameof(arrangementId));
+        ServiceDetails![index].ArrangementId = arrangementId;
+    }
 }
 
 public sealed class ServiceItemDetails
@@ -93,6 +106,7 @@ public sealed class ServiceItemDetails
     public string Section { get; set; } = "Service";
     public string Notes { get; set; } = "";
     public int? PlannedMinutes { get; set; }
+    public string? ArrangementId { get; set; }
 }
 
 public sealed class Presentation
@@ -101,6 +115,15 @@ public sealed class Presentation
     public string Name { get; set; } = "Untitled";
     public string Kind { get; set; } = "song";
     public List<Slide> Slides { get; set; } = [];
+    public List<SlideArrangement> Arrangements { get; set; } = [];
+}
+
+public sealed class SlideArrangement
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = "Arrangement";
+    // Ordered block IDs may repeat, so a chorus can recur without copying slides.
+    public List<string> BlockIds { get; set; } = [];
 }
 
 public sealed class Slide
@@ -109,6 +132,8 @@ public sealed class Slide
     public string Name { get; set; } = "Slide";
     public string Text { get; set; } = "";
     public string? MediaPath { get; set; }
+    // Slides from the same song section share this ID; older shows may omit it.
+    public string? SectionId { get; set; }
     public string Background { get; set; } = "#0B1220";
     // Null keeps the appearance of shows created before typography was editable.
     public SlideTextStyle? TextStyle { get; set; }
@@ -167,9 +192,13 @@ public static class ShowFiles
         if (show.Version != 1 || show.Presentations is null)
             throw new InvalidDataException("Unsupported show file version.");
         foreach (var presentation in show.Presentations)
+        {
             SongParser.RepairLegacyHeadings(presentation);
+            PresentationArrangements.Validate(presentation);
+        }
         show.EnsureServiceItems();
         Overlay.ValidateList(show.Overlays);
+        foreach (var presentation in show.Presentations) PresentationArrangements.Validate(presentation);
         return show;
     }
 

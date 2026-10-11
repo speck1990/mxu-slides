@@ -315,6 +315,7 @@ public sealed class DeckEditor : Window
         var index = _slides.SelectedIndex;
         if (index < 0 || _draft.Slides.Count == 1) return;
         _draft.Slides.RemoveAt(index);
+        PresentationArrangements.PruneMissingBlocks(_draft);
         _slides.Items.Refresh();
         _slides.SelectedIndex = Math.Min(index, _draft.Slides.Count - 1);
     }
@@ -331,7 +332,7 @@ public sealed class DeckEditor : Window
     private void Save()
     {
         try { PresentationEditing.Validate(_draft); DialogResult = true; }
-        catch (Exception error) when (error is ArgumentException or FileNotFoundException)
+        catch (Exception error) when (error is ArgumentException or InvalidDataException or FileNotFoundException)
         { MessageBox.Show(this, error.Message, "Slides", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
 }
