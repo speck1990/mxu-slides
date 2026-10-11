@@ -585,7 +585,8 @@ public partial class MainWindow : Window
     private void OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (Keyboard.Modifiers != ModifierKeys.None ||
-            Keyboard.FocusedElement is TextBox or ComboBox or DatePicker or ButtonBase) return;
+            Keyboard.FocusedElement is TextBox or ComboBox or DatePicker ||
+            e.Key == Key.Space && Keyboard.FocusedElement is ButtonBase) return;
         if (e.Key == Key.F5) { ToggleProjection(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.B) { ToggleBlack(this, new RoutedEventArgs()); e.Handled = true; }
         else if (e.Key == Key.Right || e.Key == Key.Space)
