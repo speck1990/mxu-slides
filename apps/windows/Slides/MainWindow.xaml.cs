@@ -377,7 +377,7 @@ public partial class MainWindow : Window
 
     private void EditLibraryArrangements(object sender, RoutedEventArgs e)
     {
-        if (LibraryList.SelectedItem is not { Kind: "song" } source) return;
+        if (LibraryList.SelectedItem is not Presentation { Kind: "song" } source) return;
         OpenArrangementEditor(source);
     }
 
