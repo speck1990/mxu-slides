@@ -92,6 +92,7 @@
             <Button Content="↑" ToolTip="Move earlier" Click="MoveServiceUp" />
             <Button Content="↓" ToolTip="Move later" Click="MoveServiceDown" />
             <Button Content="Remove" Click="RemovePresentation" />
+            <Button Content="Duplicate" Click="DuplicateServiceItem" ToolTip="Repeat this item with a separate live timer" />
             <Button Content="Plan Item" Click="PlanServiceItem" />
           </WrapPanel>
         </StackPanel>

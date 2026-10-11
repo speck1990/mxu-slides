@@ -43,6 +43,22 @@ public sealed class Show
         ServiceDetails!.RemoveAt(index);
     }
 
+    public int DuplicateServiceItem(int index)
+    {
+        EnsureServiceItems();
+        if (index < 0 || index >= ServiceItems!.Count)
+            throw new ArgumentOutOfRangeException(nameof(index));
+        var source = ServiceDetails![index];
+        ServiceItems.Insert(index + 1, ServiceItems[index]);
+        ServiceDetails.Insert(index + 1, new ServiceItemDetails
+        {
+            Section = source.Section,
+            Notes = source.Notes,
+            PlannedMinutes = source.PlannedMinutes
+        });
+        return index + 1;
+    }
+
     public void MoveServiceItem(int from, int to)
     {
         EnsureServiceItems();

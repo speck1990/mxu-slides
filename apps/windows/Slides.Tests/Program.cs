@@ -86,6 +86,21 @@ var cases = new (string Name, Action Run)[]
         try { show.EnsureServiceItems(); throw new Exception("FAIL mismatched service details accepted"); }
         catch (InvalidDataException) { }
     }),
+    ("duplicated service item copies plan but gets independent timing identity", () =>
+    {
+        var song = SongParser.Parse("Repeat", "[Chorus]\nSing");
+        var show = new Show { Presentations = [song], ServiceItems = [] };
+        show.AddToService(song.Id);
+        show.UpdateServiceItem(0, "Post-Service", "Repeat softly", 3);
+        var copyIndex = show.DuplicateServiceItem(0);
+        Check(copyIndex == 1 && show.ServiceItems!.SequenceEqual([song.Id, song.Id]) &&
+            show.ServiceDetails![0].Id != show.ServiceDetails[1].Id &&
+            show.ServiceDetails[1].Section == "Post-Service" &&
+            show.ServiceDetails[1].Notes == "Repeat softly" &&
+            show.ServiceDetails[1].PlannedMinutes == 3, "new occurrence has copied plan and new ID");
+        show.UpdateServiceItem(1, "Service", "Changed", 4);
+        Check(show.ServiceDetails[0].Notes == "Repeat softly", "editing duplicate does not change source");
+    }),
     ("overlays stay in the library and portable show", () =>
     {
         var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));

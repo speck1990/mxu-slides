@@ -443,6 +443,13 @@ public partial class MainWindow : Window
         Changed(Math.Max(0, index - 1));
     }
 
+    private void DuplicateServiceItem(object sender, RoutedEventArgs e)
+    {
+        var index = SelectedServiceIndex;
+        if (index < 0) return;
+        Try(() => Changed(_show.DuplicateServiceItem(index)));
+    }
+
     private void PlanServiceItem(object sender, RoutedEventArgs e)
     {
         var index = SelectedServiceIndex;
