@@ -249,13 +249,20 @@ var cases = new (string Name, Action Run)[]
         var elements = new List<SlideElement> { text };
         var ellipse = SlideLayout.AddEllipse(elements);
         ellipse.FillColorHex = "#FFAA00FF";
+        ellipse.RotationDegrees = 35;
+        ellipse.Opacity = 0.65;
+        ellipse.FlipHorizontal = true;
+        ellipse.FlipVertical = true;
         var slide = new Slide { TextStyle = new SlideTextStyle { FontSize = 61 } };
         SlideLayout.Apply(slide, elements);
         var deck = new Presentation { Kind = "deck", Slides = [slide] };
         var library = new PresentationLibrary();
         library.Upsert(deck);
         Check(library.Presentations[0].Slides[0].TextStyle?.FontSize == 61 &&
-            library.Presentations[0].Slides[0].Elements?[1].ShapeKind == "ellipse",
+            library.Presentations[0].Slides[0].Elements?[1].ShapeKind == "ellipse" &&
+            library.Presentations[0].Slides[0].Elements?[1].RotationDegrees == 35 &&
+            library.Presentations[0].Slides[0].Elements?[1].Opacity == 0.65 &&
+            library.Presentations[0].Slides[0].Elements?[1].FlipHorizontal == true,
             "library copy retains typography and objects");
         var show = new Show { ServiceItems = [] };
         library.AddToShow(show, deck.Id);
@@ -266,10 +273,28 @@ var cases = new (string Name, Action Run)[]
         try
         {
             ShowFiles.Save(path, show);
-            Check(ShowFiles.Load(path).Presentations[0].Slides[0].Elements?[1].ShapeKind == "ellipse",
-                "ellipse survives a show save");
+            var saved = ShowFiles.Load(path).Presentations[0].Slides[0].Elements![1];
+            Check(saved.ShapeKind == "ellipse" && saved.RotationDegrees == 35 &&
+                saved.Opacity == 0.65 && saved.FlipHorizontal && saved.FlipVertical,
+                "ellipse transforms survive a show save");
         }
         finally { File.Delete(path); }
+    }),
+    ("object effects validate ranges and keep legacy defaults", () =>
+    {
+        var old = JsonSerializer.Deserialize<SlideElement>("""{"kind":"shape","name":"Old rectangle"}""", ShowFiles.Json)!;
+        Check(old.RotationDegrees == 0 && old.Opacity == 1 && !old.FlipHorizontal && !old.FlipVertical,
+            "older layouts retain their appearance");
+        old.Opacity = double.NaN;
+        try { SlideLayout.Validate([old]); throw new Exception("FAIL NaN opacity accepted"); }
+        catch (ArgumentException) { }
+        old.Opacity = 1.1;
+        try { SlideLayout.Validate([old]); throw new Exception("FAIL opacity above 100 accepted"); }
+        catch (ArgumentException) { }
+        old.Opacity = 1;
+        old.RotationDegrees = double.PositiveInfinity;
+        try { SlideLayout.Validate([old]); throw new Exception("FAIL infinite rotation accepted"); }
+        catch (ArgumentException) { }
     }),
     ("positioned images keep their fit mode and reject missing files", () =>
     {
@@ -520,12 +545,15 @@ var cases = new (string Name, Action Run)[]
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".json");
         try
         {
-            File.WriteAllText(path, """{"name":"Welcome","presentationKind":"deck","slides":[{"name":"Intro","objects":[{"objectKind":"shape","shapeKind":"roundedRectangle","name":"Blue plate","text":"","x":200,"y":100,"width":800,"height":300,"cornerRadius":20,"fill":{"fillKind":"solid","colorHex":"#3B82F6FF"}},{"objectKind":"text","name":"Title","text":"Hello","x":240,"y":140,"width":720,"height":220,"textStyle":{"fontName":"Georgia","fontSize":96,"colorHex":"#FFFFFFFF"}}]}]}""");
+            File.WriteAllText(path, """{"name":"Welcome","presentationKind":"deck","slides":[{"name":"Intro","objects":[{"objectKind":"shape","shapeKind":"roundedRectangle","name":"Blue plate","text":"","x":200,"y":100,"width":800,"height":300,"cornerRadius":20,"rotationDegrees":15,"opacity":0.75,"flipHorizontal":true,"fill":{"fillKind":"solid","colorHex":"#3B82F6FF"}},{"objectKind":"text","name":"Title","text":"Hello","x":240,"y":140,"width":720,"height":220,"flipVertical":true,"textStyle":{"fontName":"Georgia","fontSize":96,"colorHex":"#FFFFFFFF"}}]}]}""");
             var slide = MxuPresentationImport.Load(path).Slides[0];
             var importedElements = slide.Elements!;
             Check(importedElements.Count == 2 && importedElements[0].Kind == "shape" &&
                 importedElements[0].X == 100 && importedElements[0].Width == 400 &&
                 importedElements[0].CornerRadius == 10, "Mac rectangle scaled to Windows canvas");
+            Check(importedElements[0].RotationDegrees == 15 && importedElements[0].Opacity == 0.75 &&
+                importedElements[0].FlipHorizontal && importedElements[1].FlipVertical,
+                "Mac rotation, opacity, and flips map to Windows objects");
             Check(importedElements[1].Text == "Hello" && importedElements[1].X == 120 &&
                 importedElements[1].TextStyle?.FontSize == 48, "positioned text and style imported");
             Check(slide.Text == "Hello", "text summary remains available");
