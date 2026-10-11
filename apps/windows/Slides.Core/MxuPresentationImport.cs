@@ -76,7 +76,7 @@ public static class MxuPresentationImport
         if (!Number(item, "x", out var x) || !Number(item, "y", out var y) ||
             !Number(item, "width", out var width) || !Number(item, "height", out var height))
             return null;
-        if (kind == "shape" && Text(item, "shapeKind") is not ("rectangle" or "roundedRectangle"))
+        if (kind == "shape" && Text(item, "shapeKind") is not ("rectangle" or "roundedRectangle" or "ellipse"))
             return null;
         var element = new SlideElement
         {
@@ -85,6 +85,7 @@ public static class MxuPresentationImport
             Name = string.IsNullOrWhiteSpace(Text(item, "name"))
                 ? (kind == "text" ? "Text" : "Rectangle") : Text(item, "name")!,
             Text = Text(item, "text") ?? "",
+            ShapeKind = Text(item, "shapeKind") == "ellipse" ? "ellipse" : "rectangle",
             X = x / 2, Y = y / 2, Width = width / 2, Height = height / 2,
             TextStyle = item.TryGetProperty("textStyle", out var style)
                 ? SlideThemes.FromMxuTextStyle(style) : null

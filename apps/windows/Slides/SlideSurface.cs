@@ -109,12 +109,14 @@ public sealed class SlideSurface : Grid
                 FrameworkElement visual;
                 if (element.Kind == "shape")
                 {
-                    visual = new Border
-                    {
-                        Width = element.Width, Height = element.Height,
-                        Background = Brush(element.FillColorHex),
-                        CornerRadius = new CornerRadius(Math.Max(0, element.CornerRadius))
-                    };
+                    visual = element.ShapeKind == "ellipse"
+                        ? new System.Windows.Shapes.Ellipse { Width = element.Width, Height = element.Height, Fill = Brush(element.FillColorHex) }
+                        : new Border
+                        {
+                            Width = element.Width, Height = element.Height,
+                            Background = Brush(element.FillColorHex),
+                            CornerRadius = new CornerRadius(Math.Max(0, element.CornerRadius))
+                        };
                 }
                 else if (element.Kind == "text")
                 {

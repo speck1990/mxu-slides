@@ -37,6 +37,30 @@ public static partial class SlideLayout
         return element;
     }
 
+    public static SlideElement AddEllipse(List<SlideElement> elements)
+    {
+        var element = AddShape(elements);
+        element.Name = $"Ellipse {elements.Count}";
+        element.ShapeKind = "ellipse";
+        return element;
+    }
+
+    public static void Translate(SlideElement element, double dx, double dy)
+    {
+        if (!double.IsFinite(dx) || !double.IsFinite(dy))
+            throw new ArgumentException("Enter a valid movement.");
+        element.X = Math.Clamp(element.X + dx, -960, 1920);
+        element.Y = Math.Clamp(element.Y + dy, -540, 1080);
+    }
+
+    public static void Resize(SlideElement element, double dw, double dh)
+    {
+        if (!double.IsFinite(dw) || !double.IsFinite(dh))
+            throw new ArgumentException("Enter a valid size change.");
+        element.Width = Math.Clamp(element.Width + dw, 12, 1920);
+        element.Height = Math.Clamp(element.Height + dh, 12, 1080);
+    }
+
     public static SlideElement Duplicate(List<SlideElement> elements, int index)
     {
         var copy = Copy([elements[index]])[0];
@@ -80,6 +104,8 @@ public static partial class SlideLayout
                 throw new ArgumentException($"Enter valid position and size for {item.Name}.");
             if (item.Kind == "shape" && (item.FillColorHex is null || !ColorHex().IsMatch(item.FillColorHex)))
                 throw new ArgumentException($"Use #RRGGBB or #RRGGBBAA for {item.Name}'s fill.");
+            if (item.Kind == "shape" && item.ShapeKind is not ("rectangle" or "ellipse"))
+                throw new ArgumentException($"Choose a supported shape for {item.Name}.");
             if (!double.IsFinite(item.CornerRadius) || item.CornerRadius is < 0 or > 200)
                 throw new ArgumentException($"Enter a corner radius from 0 to 200 for {item.Name}.");
             if (item.TextStyle is { } style)
