@@ -14,6 +14,8 @@ This is Stephen Peck's personal Windows port of MxU Slides. Keep MxU's original 
 
 `ShowPackage` exports a `.slidespack` ZIP with a format marker, `show.json`, and content-hashed media entries. `MediaPaths` enumerates both slide background media and positioned image objects for packaging and relinking. Opening a package validates references and hashes, then caches media under `%LOCALAPPDATA%\Slides\packages`. Preserve ordinary `.pshow` JSON compatibility. Never extract arbitrary ZIP entries or mutate the live show while packing.
 
+`ServiceRun` measures the operator's live session with a monotonic clock. Key item timing by `ServiceItemDetails.Id`, not presentation ID or list index, because a presentation can appear more than once and items can move. Run times are deliberately not part of `.pshow` or `.slidespack`; reset them when opening or starting a show. Keep any new live controls in sync with selection and fullscreen navigation.
+
 The Windows importer currently supports text objects and solid background colors from a standalone MxU Presentation JSON file. It does not read the macOS Automerge library or render advanced objects. Preserve unknown fields at the schema level; do not claim full library compatibility until it is implemented.
 
 Use `docs/windows-parity.md` as the feature inventory for the Windows port. Update it when behavior is implemented and verified on Windows; visual similarity alone does not close a parity gap.

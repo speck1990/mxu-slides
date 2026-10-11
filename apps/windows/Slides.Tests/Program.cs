@@ -86,6 +86,36 @@ var cases = new (string Name, Action Run)[]
         try { show.EnsureServiceItems(); throw new Exception("FAIL mismatched service details accepted"); }
         catch (InvalidDataException) { }
     }),
+    ("live service timing follows occurrences and survives pause and reorder", () =>
+    {
+        var clock = new ManualClock();
+        var run = new ServiceRun(clock);
+        var show = new Show { Presentations = [SongParser.Parse("Song", "Lyrics")], ServiceItems = [] };
+        show.AddToService(show.Presentations[0].Id);
+        show.AddToService(show.Presentations[0].Id);
+        var first = show.ServiceDetails![0].Id;
+        var second = show.ServiceDetails[1].Id;
+        run.Select(first);
+        run.Start();
+        clock.Advance(TimeSpan.FromSeconds(25));
+        run.Select(second);
+        clock.Advance(TimeSpan.FromSeconds(15));
+        run.Pause();
+        clock.Advance(TimeSpan.FromSeconds(20));
+        Check(run.ServiceElapsed == TimeSpan.FromSeconds(40) &&
+            run.ItemElapsed(first) == TimeSpan.FromSeconds(25) &&
+            run.ItemElapsed(second) == TimeSpan.FromSeconds(15), "pause and switch track each occurrence");
+        show.MoveServiceItem(1, 0);
+        run.Select(show.ServiceDetails![0].Id);
+        run.Start();
+        clock.Advance(TimeSpan.FromSeconds(10));
+        Check(run.CurrentItemElapsed == TimeSpan.FromSeconds(25) &&
+            run.ServiceElapsed == TimeSpan.FromSeconds(50), "reorder retains occurrence timing");
+        run.Reset();
+        Check(!run.IsRunning && run.ServiceElapsed == TimeSpan.Zero &&
+            run.ItemElapsed(first) == TimeSpan.Zero && run.ItemElapsed(second) == TimeSpan.Zero,
+            "reset clears the live run");
+    }),
     ("library survives a new show and keeps show snapshots independent", () =>
     {
         var folder = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -611,4 +641,12 @@ foreach (var test in cases)
 static void Check(bool result, string name)
 {
     if (!result) throw new Exception($"FAIL {name}");
+}
+
+sealed class ManualClock : TimeProvider
+{
+    private long _ticks;
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+    public override long GetTimestamp() => _ticks;
+    public void Advance(TimeSpan duration) => _ticks += duration.Ticks;
 }
